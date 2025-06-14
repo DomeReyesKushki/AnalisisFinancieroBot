@@ -4,16 +4,20 @@ import google.generativeai as genai
 import os
 import json
 import datetime
-from dotenv import load_dotenv # Para cargar variables de entorno del .env
+# from dotenv import load_dotenv # COMENTAR o ELIMINAR: No usaremos .env en Streamlit Cloud
 import tempfile # Para manejar archivos temporales
 
-# --- Configuración de la API de Gemini ---
-load_dotenv() # Carga las variables de entorno del archivo .env
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+# --- Configuración de la API de Gemini (para Streamlit Cloud) ---
+# load_dotenv() # COMENTAR o ELIMINAR: Streamlit Cloud no usa .env
+# GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") # COMENTAR o ELIMINAR: No leer desde os.getenv
 
-if not GOOGLE_API_KEY:
-    st.error("Error: La clave de API de Google Gemini (GOOGLE_API_KEY) no se encontró en el archivo .env.")
-    st.info("Asegúrate de que tienes un archivo .env en la misma carpeta del notebook con la línea: GOOGLE_API_KEY='TU_CLAVE_REAL_AQUI'")
+# Streamlit Cloud carga los secretos automáticamente en st.secrets
+# Asegúrate de que tu secret en Streamlit Cloud se llame GOOGLE_API_KEY
+if "GOOGLE_API_KEY" in st.secrets:
+    GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+else:
+    st.error("Error: La clave de API de Google Gemini (GOOGLE_API_KEY) no se encontró en Streamlit Secrets.")
+    st.info("Por favor, configura tu secret 'GOOGLE_API_KEY' en Streamlit Community Cloud (Menú -> Secrets) con el formato: GOOGLE_API_KEY='TU_CLAVE_REAL_AQUI'")
     st.stop() # Detiene la ejecución de la aplicación si no hay clave
 
 genai.configure(api_key=GOOGLE_API_KEY)
@@ -120,13 +124,13 @@ def get_exchange_rate(currency_code, target_currency="USD", date=None):
         return 1.0 
 
 # --- Función de Extracción de Datos con Gemini ---
-def extract_financial_data(uploaded_file_content, api_key): # Recibe el contenido de UN archivo
+def extract_financial_data(uploaded_file_content, api_key): 
     model = genai.GenerativeModel('gemini-1.5-flash') 
 
-    extracted_data_for_file = {} # Devolverá los datos de UN archivo procesado
+    extracted_data_for_file = {} 
     
-    file_name = uploaded_file_content.name # Streamlit FileUploader ya tiene .name
-    file_bytes = uploaded_file_content.read() # Streamlit FileUploader ya tiene .read()
+    file_name = uploaded_file_content.name 
+    file_bytes = uploaded_file_content.read() 
     
     st.write(f"Procesando archivo: {file_name}")
     
@@ -138,7 +142,6 @@ def extract_financial_data(uploaded_file_content, api_key): # Recibe el contenid
         
         pdf_part = genai.upload_file(path=temp_file_path, display_name=file_name)
 
-        # PROMPT (sin cambios)
         prompt = f"""
         Analiza cuidadosamente el siguiente documento PDF que contiene estados financieros.
 
@@ -162,13 +165,13 @@ def extract_financial_data(uploaded_file_content, api_key): # Recibe el contenid
             -   "Inventario Equipos": valor
             -   "Gasto Anticipado": valor
             -   "Otros activos": valor
-            -   "Total Activo Corriente": valor
+            "Total Activo Corriente": valor
         -   **Activos No Corrientes:**
             -   "Propiedad, planta y equipo": valor
             -   "Activo Fijo": valor
             -   "Intangibles (Software)": valor
             -   "Otros Activos No Corrientes": valor
-            -   "Total Activo No Corriente": valor
+            "Total Activo No Corriente": valor
         -   **TOTAL ACTIVOS**: valor
         -   **Pasivos a Corto Plazo:**
             -   "Préstamos y empréstitos corrientes": valor
@@ -180,13 +183,13 @@ def extract_financial_data(uploaded_file_content, api_key): # Recibe el contenid
             -   "Impuestos Corrientes (Pasivo)": valor
             -   "Impuestos por pagar": valor
             -   "Otros pasivos corrientes": valor
-            -   "Total Pasivo Corriente": valor
+            "Total Pasivo Corriente": valor
         -   **Pasivos a Largo Plazo:** (Si no están explícitamente listados, omite esta sección.)
             -   "Préstamos y empréstitos no corrientes": valor
             -   "Obligaciones Financieras No Corrientes": valor
             -   "Anticipos y Avances Recibidos": valor
             -   "Otros pasivos no corrientes": valor
-            -   "Total Pasivo No Corriente": valor
+            "Total Pasivo No Corriente": valor
         -   **TOTAL PASIVOS**: valor
         -   **Patrimonio Atribuible a los Propietarios de la Matriz:**
             -   "Capital social": valor
@@ -195,7 +198,7 @@ def extract_financial_data(uploaded_file_content, api_key): # Recibe el contenid
             -   "Resultados Ejerc. Anteriores": valor
             -   "Resultado del Ejercicio": valor
             -   "Otros componentes del patrimonio": valor
-            -   "TOTAL PATRIMONIO": valor
+            "TOTAL PATRIMONIO": valor
         -   **TOTAL PASIVO Y PATRIMONIO**: valor
 
         **Paso 3: Extracción de Estado de Pérdidas y Ganancias (por Año, si presente).**
@@ -249,10 +252,9 @@ def extract_financial_data(uploaded_file_content, api_key): # Recibe el contenid
         response = model.generate_content([prompt, pdf_part], stream=False)
         
         st.write(f"\n--- Respuesta cruda de Gemini para {file_name} ---")
-        st.code(response.text, language='json') # Muestra el JSON de forma bonita en Streamlit
+        st.code(response.text, language='json') 
         st.write("---------------------------------")
 
-        # Intentar parsear y almacenar
         json_start = response.text.find('{')
         json_end = response.text.rfind('}') + 1
         
@@ -263,15 +265,14 @@ def extract_financial_data(uploaded_file_content, api_key): # Recibe el contenid
             global_currency = data_from_gemini.get("Moneda")
             global_unit = data_from_gemini.get("Unidad")
             
-            # Iterar sobre la lista de reportes por año
             for report_entry in data_from_gemini.get("ReportesPorAnio", []):
                 year_str = report_entry.get("Anio") 
                 if year_str:
-                    extracted_data_key = f"{file_name}_{year_str}" # Clave única: nombre_archivo_año
-                    extracted_data_for_file[extracted_data_key] = { # Almacenamos en el diccionario para UN archivo
+                    extracted_data_key = f"{file_name}_{year_str}" 
+                    extracted_data_for_file[extracted_data_key] = { 
                         "Moneda": global_currency,
                         "Unidad": global_unit,
-                        "AnioInforme": year_str, # Mantenerlo como string, convertir a int en Celda 4
+                        "AnioInforme": year_str, 
                         "BalanceGeneral": report_entry.get("BalanceGeneral", {}),
                         "EstadoResultados": report_entry.get("EstadoResultados", {})
                     }
@@ -290,7 +291,7 @@ def extract_financial_data(uploaded_file_content, api_key): # Recibe el contenid
         if 'pdf_part' in locals() and pdf_part:
             genai.delete_file(pdf_part.name)
 
-    return extracted_data_for_file # Retornamos los datos procesados para UN archivo
+    return extracted_data_for_file 
 
 
 # --- Función de Conversión a USD ---
@@ -301,7 +302,6 @@ def convert_to_usd(data_dict, currency_code, report_year, unit="unidades"):
     """
     converted_data = {}
     
-    # Definir el factor de escala según la unidad
     scale_factor = 1.0
     if unit and isinstance(unit, str):
         unit_lower = unit.lower()
@@ -343,76 +343,54 @@ if uploaded_files_streamlit:
         
         with st.spinner("Procesando PDFs con Gemini... Esto puede tomar un momento."):
             for uploaded_file in uploaded_files_streamlit:
-                # Llama a extract_financial_data para CADA ARCHIVO
                 results_for_one_file = extract_financial_data(uploaded_file, GOOGLE_API_KEY)
                 total_extracted_results.update(results_for_one_file) # Combina todos los resultados
 
-        # --- AHORA PROCESAMOS LOS total_extracted_results PARA LA VISUALIZACIÓN Y EXPORTACIÓN ---
-        _final_data_for_display = {} 
         if total_extracted_results: 
-            for extracted_key, data_from_gemini in total_extracted_results.items():
-                
-                # Ejemplo de extracted_key: '7. Copia de los Estados Financieros de los últimos dos años.pdf_2024'
-                parts = extracted_key.rsplit('_', 1) 
-                file_name_original_pdf = parts[0]
-                year_str_from_key = parts[1] if len(parts) > 1 else None
-                
-                global_currency = data_from_gemini.get("Moneda", "N/A").upper()
-                global_unit = data_from_gemini.get("Unidad", "unidades")
-                year_int = None
-                
-                try:
-                    if year_str_from_key:
-                        year_int = int(year_str_from_key)
-                except (ValueError, TypeError):
-                    st.warning(f"Advertencia: El año '{year_str_from_key}' extraído de la clave no es un número válido para {extracted_key}. Saltando procesamiento de este reporte.")
-                    continue
-
-                if not global_currency or not year_int:
-                    st.warning(f"Advertencia: Moneda o Año no identificados para {extracted_key}. Saltando conversión.")
-                    continue
-                
-                st.write(f"Identificada moneda: {global_currency}, Año: {year_int}, Unidad: {global_unit} para {file_name_original_pdf} (Reporte {year_int}).")
-                
-                balance_data_for_year = data_from_gemini.get("BalanceGeneral", {})
-                pnl_data_for_year = data_from_gemini.get("EstadoResultados", {})
-
-                # Convertir a USD usando la función convert_to_usd
-                converted_balance_for_year = convert_to_usd(balance_data_for_year, global_currency, year_int, global_unit) 
-                converted_pnl_for_year = convert_to_usd(pnl_data_for_year, global_currency, year_int, global_unit)
-                
-                if file_name_original_pdf not in _final_data_for_display:
-                    _final_data_for_display[file_name_original_pdf] = {}
-                _final_data_for_display[file_name_original_pdf][year_int] = {
-                    "BalanceGeneralUSD": converted_balance_for_year,
-                    "EstadoResultadosUSD": converted_pnl_for_year
-                }
-        else:
-            st.warning("No se extrajeron datos válidos de ningún archivo para la conversión. Verifique el formato de los PDFs y el prompt.")
-
-        # === PUNTO DE CONTROL FINAL PARA LA VISUALIZACIÓN Y EXPORTACIÓN ===
-        if _final_data_for_display: 
             st.success("¡Datos extraídos y convertidos a USD con éxito!")
 
             # 1. VISUALIZACIÓN DEL BALANCE GENERAL
             st.subheader("Balance General (Valores en USD)")
             
-            all_balance_concepts_display_order = []
+            all_balance_concepts_ordered = []
             for category_name, items_list in BALANCE_SHEET_STRUCTURE.items():
-                all_balance_concepts_display_order.append(category_name) 
+                all_balance_concepts_ordered.append(category_name) 
                 if category_name not in ["TOTAL ACTIVOS", "TOTAL PASIVOS", "TOTAL PASIVO Y PATRIMONIO"]:
-                    all_balance_concepts_display_order.extend([f"    {item}" for item in items_list]) 
+                    all_balance_concepts_ordered.extend([f"    {item}" for item in items_list]) 
                 else: 
-                    all_balance_concepts_display_order.extend([f"    {item}" for item in items_list if item != category_name]) 
+                    all_balance_concepts_ordered.extend([f"    {item}" for item in items_list if item != category_name]) 
 
-            df_balance_combined = pd.DataFrame(index=all_balance_concepts_display_order) 
+            df_balance_combined = pd.DataFrame(index=all_balance_concepts_ordered) 
             
-            for file_name_original_pdf, file_years_data in _final_data_for_display.items():
-                for year, converted_data_for_year in sorted(file_years_data.items()): 
-                    balance_data_usd = converted_data_for_year.get("BalanceGeneralUSD", {})
+            for extracted_key, data_from_gemini in total_extracted_results.items():
+                # Ejemplo de extracted_key: '7. Copia de los Estados Financieros de los últimos dos años.pdf_2024'
+                parts = extracted_key.rsplit('_', 1) 
+                file_name_original_pdf = parts[0]
+                year_str_from_key = parts[1] if len(parts) > 1 else None
+                
+                # Convertir a int para buscar en _final_data_for_display
+                current_year_int = int(year_str_from_key) if year_str_from_key and year_str_from_key.isdigit() else None
+                
+                if file_name_original_pdf in total_extracted_results and current_year_int:
+                    # Aquí la clave es acceder a los datos que ya están convertidos
+                    # La estructura de total_extracted_results ahora es { 'filename_year': { 'Moneda': ..., 'BalanceGeneral': {}, ... }}
+                    # Necesitamos los datos del balance ya convertidos a USD
                     
-                    col_name = f"Valor - {file_name_original_pdf} ({year})" 
-                    temp_column_data = pd.Series(index=all_balance_concepts_display_order, dtype=object)
+                    # Vamos a re-generar los converted_results_for_display para cada archivo/año
+                    # para construir las columnas. Esto es redundante pero asegura que tenemos los datos correctos.
+                    
+                    currency = data_from_gemini.get("Moneda", "N/A").upper()
+                    unit = data_from_gemini.get("Unidad", "unidades")
+                    
+                    balance_data_usd = convert_to_usd(
+                        data_from_gemini.get("BalanceGeneral", {}), 
+                        currency, 
+                        current_year_int, 
+                        unit
+                    )
+                    
+                    col_name = f"Valor - {file_name_original_pdf} ({current_year_int})" 
+                    temp_column_data = pd.Series(index=all_balance_concepts_ordered, dtype=object)
 
                     for category_name_outer, items_list_outer in BALANCE_SHEET_STRUCTURE.items():
                         if category_name_outer in balance_data_usd:
@@ -426,7 +404,9 @@ if uploaded_files_streamlit:
                              temp_column_data.loc[category_name_outer] = balance_data_usd[category_name_outer]
                     
                     df_balance_combined[col_name] = temp_column_data 
-                    
+                else:
+                    st.warning(f"Advertencia: No se encontraron datos para {extracted_key} al construir la tabla de Balance General.")
+                
             for col in df_balance_combined.columns:
                 df_balance_combined[col] = df_balance_combined[col].apply(
                     lambda x: f"{x:,.2f}" if isinstance(x, (int, float)) else ("" if pd.isna(x) else x)
@@ -439,17 +419,32 @@ if uploaded_files_streamlit:
 
             df_pnl_combined = pd.DataFrame(index=PNL_STANDARD_ITEMS) 
 
-            for file_name_original_pdf, file_years_data in _final_data_for_display.items():
-                for year, converted_data_for_year in sorted(file_years_data.items()): 
-                    pnl_data_usd = converted_data_for_year.get("EstadoResultadosUSD", {})
+            for extracted_key, data_from_gemini in total_extracted_results.items(): # Re-iterar
+                parts = extracted_key.rsplit('_', 1) 
+                file_name_original_pdf = parts[0]
+                year_str_from_key = parts[1] if len(parts) > 1 else None
+                current_year_int = int(year_str_from_key) if year_str_from_key and year_str_from_key.isdigit() else None
 
-                    col_name = f"Valor - {file_name_original_pdf} ({year})" 
+                if file_name_original_pdf in total_extracted_results and current_year_int:
+                    currency = data_from_gemini.get("Moneda", "N/A").upper()
+                    unit = data_from_gemini.get("Unidad", "unidades")
+
+                    pnl_data_usd = convert_to_usd(
+                        data_from_gemini.get("EstadoResultados", {}), 
+                        currency, 
+                        current_year_int, 
+                        unit
+                    )
+
+                    col_name = f"Valor - {file_name_original_pdf} ({current_year_int})" 
                     temp_column_data = pd.Series(index=PNL_STANDARD_ITEMS, dtype=object)
                     for item in PNL_STANDARD_ITEMS:
                         if item in pnl_data_usd:
                             temp_column_data.loc[item] = pnl_data_usd[item]
                     
                     df_pnl_combined[col_name] = temp_column_data
+                else:
+                    st.warning(f"Advertencia: No se encontraron datos para {extracted_key} al construir la tabla de Estado de Pérdidas y Ganancias.")
                 
             for col in df_pnl_combined.columns:
                 df_pnl_combined[col] = df_pnl_combined[col].apply(
@@ -459,7 +454,6 @@ if uploaded_files_streamlit:
             st.dataframe(df_pnl_combined) 
 
             # --- SECCIÓN DE EXPORTACIÓN A EXCEL (Integrada) ---
-            
             # Crear un objeto BytesIO para guardar el Excel en memoria
             import io
             output_excel_buffer = io.BytesIO()
@@ -476,7 +470,6 @@ if uploaded_files_streamlit:
                     else:
                         st.info("Nota: El Estado de Pérdidas y Ganancias está vacío y no se exportó a Excel.")
                 
-                # Volver al inicio del buffer
                 output_excel_buffer.seek(0)
                 
                 st.download_button(
@@ -489,7 +482,7 @@ if uploaded_files_streamlit:
             except Exception as e:
                 st.error(f"Error al exportar a Excel: {e}")
 
-        else: 
+        else: # Este else se ejecuta si total_extracted_results está vacío (no se extrajo nada de ningún archivo/año)
             st.error("No se pudieron extraer o convertir datos de los PDFs. Asegúrate de que los documentos sean legibles y contengan estados financieros estándar.")
 
 else:
