@@ -151,21 +151,21 @@ def extract_financial_data(uploaded_file_content_object, api_key):
         
         pdf_part = genai.upload_file(path=temp_file_path, display_name=file_name)
 
-        # PROMPT MEJORADO PARA DETECCIÓN DE MONEDA MÁS ROBUSTA Y NÚMEROS TAL CUAL
+        # PROMPT MEJORADO: Ahora Gemini NO devolverá "Unidad". Asumiremos valor directo.
+        # Y la inferencia de moneda es más robusta.
         prompt = f"""
         Analiza cuidadosamente el siguiente documento PDF que contiene estados financieros.
 
         **Objetivo Principal:** Extraer los datos financieros del Balance General y del Estado de Pérdidas y Ganancias para CADA COLUMNA de DICIEMBRE (ej. "DICIEMBRE 2024", "DICIEMBRE 2023") que encuentres en el documento. Si no hay columnas de DICIEMBRE, entonces extrae los datos para las ÚLTIMAS 2 COLUMNAS de fecha disponibles (generalmente años fiscales).
 
-        **Paso 1: Identificación de Moneda, Unidad de Magnitud y Años de Reporte.**
+        **Paso 1: Identificación de Moneda y Años de Reporte.**
         -   **Moneda Global:** Identifica la moneda principal. Busca símbolos de moneda ($, €, S/, Bs), códigos ISO (USD, EUR, MXN, COP, CLP, PEN), o palabras como "Pesos Mexicanos", "Pesos Colombianos", "Soles Peruanos", "Dólares", "Euros". Si el documento menciona el país de la empresa (ej. "Mexico", "Colombia", "Chile", "Perú"), infiere la moneda local si no está explícitamente definida (ej. "Mexico" -> MXN, "Colombia" -> COP, "Chile" -> CLP, "Perú" -> PEN). Extrae el código ISO o abreviatura más común (COP, CLP, MXN, USD, EUR, PEN). Si no se puede inferir con certeza, usa "USD" como valor por defecto.
-        -   **Unidad Global (Escala):** Identifica la unidad de los valores. Si el documento dice "CLP$m", "US$m", "Expresado en millones", la unidad es "millones". Si dice "miles de pesos", la unidad es "miles". Si no indica, asume "unidades".
         -   **Años de Reporte:** Identifica TODOS los años de las columnas de DICIEMBRE disponibles (ej. 2024, 2023). Si no hay DICIEMBRE, identifica los años de las últimas 2 columnas de fecha disponibles.
 
         **Paso 2: Extracción de Valores y Encasillamiento Flexible para Balance General (por Año).**
         Para cada año/columna de fecha identificada, extrae los valores NUMÉRICOS.
-        **MUY IMPORTANTE:** Los valores numéricos deben ser el número **TAL CUAL APARECE EN EL DOCUMENTO**, sin aplicar ninguna multiplicación por "millones" o "miles" aquí. Esa escala se aplicará en Python.
-        Sé flexible con los nombres de las cuentas que encuentres y encasíllalas en las categorías ESTÁNDAR proporcionadas. Si no encaja, omítela o déjala como "N/A".
+        **MUY IMPORTANTE:** Los valores numéricos deben ser el **VALOR COMPLETO EN UNIDADES BASE de la moneda, TAL CUAL APARECE EN EL DOCUMENTO, sin aplicar ninguna multiplicación por "millones" o "miles" aquí.** Si el documento dice "1.485.361" y es "CLP$m", devuelve 1485361. Si dice "77.448,01", devuelve 77448.01. La conversión a la unidad final (millones o miles) y a USD se hará en Python.
+        Sé flexible con los nombres de las cuentas que encuentres en el documento y encasíllalas en las categorías ESTÁNDAR proporcionadas. Si una cuenta no encaja, omítela o déjala como "N/A".
 
         **Categorías ESTÁNDAR de Balance General y COINCIDENCIAS ESTRICTAS:**
         -   **Activos Corrientes:**
@@ -227,7 +227,6 @@ def extract_financial_data(uploaded_file_content_object, api_key):
 
         {{
           "Moneda": "COP",
-          "Unidad": "miles",
           "ReportesPorAnio": [
             {{
               "Anio": "2024",
@@ -273,7 +272,7 @@ def extract_financial_data(uploaded_file_content_object, api_key):
             data_from_gemini = json.loads(json_string) 
             
             global_currency = data_from_gemini.get("Moneda")
-            global_unit = data_from_gemini.get("Unidad")
+            # Ya no pedimos "Unidad" a Gemini
             
             for report_entry in data_from_gemini.get("ReportesPorAnio", []):
                 year_str = report_entry.get("Anio") 
@@ -281,8 +280,7 @@ def extract_financial_data(uploaded_file_content_object, api_key):
                     extracted_data_key = f"{file_name}_{year_str}" 
                     extracted_data_for_file[extracted_data_key] = { 
                         "Moneda": global_currency,
-                        "Unidad": global_unit,
-                        "AnioInforme": year_str, 
+                        "AnioInforme": year_str, # Eliminamos "Unidad" de aquí
                         "BalanceGeneral": report_entry.get("BalanceGeneral", {}),
                         "EstadoResultados": report_entry.get("EstadoResultados", {})
                     }
@@ -304,25 +302,21 @@ def extract_financial_data(uploaded_file_content_object, api_key):
     return extracted_data_for_file 
 
 
-def convert_to_usd(data_dict, currency_code, report_year, unit="unidades"):
-    scale_factor = 1.0
-    if unit and isinstance(unit, str):
-        unit_lower = unit.lower()
-        if "millones" in unit_lower or "$m" in unit_lower or "mm" in unit_lower:
-            scale_factor = 1_000_000.0 
-        elif "miles" in unit_lower:
-            scale_factor = 1_000.0 
-    
+def convert_to_usd(data_dict, currency_code, report_year): # Quitamos 'unit' de los parámetros
+    # scale_factor se define aquí basado en el contexto si es necesario, no de Gemini
+    # Pero si queremos valor tal cual, scale_factor es 1.0 siempre.
+    scale_factor = 1.0 # Asumimos que Gemini ya dio el valor tal cual
+
     exchange_rate = get_exchange_rate(currency_code, date=report_year)
     
-    st.write(f"DEBUG: Conversión - Moneda: {currency_code}, Año: {report_year}, Unidad: {unit}, Factor Escala: {scale_factor}, Tasa USD: {exchange_rate}")
+    st.write(f"DEBUG: Conversión - Moneda: {currency_code}, Año: {report_year}, Factor Escala: {scale_factor}, Tasa USD: {exchange_rate}")
 
     converted_data = {} 
     for key, value in data_dict.items():
         if isinstance(value, dict):
-            converted_data[key] = convert_to_usd(value, currency_code, report_year, unit) 
+            converted_data[key] = convert_to_usd(value, currency_code, report_year) # Ya no pasamos 'unit'
         elif isinstance(value, (int, float)):
-            converted_value = value * scale_factor * exchange_rate
+            converted_value = value * scale_factor * exchange_rate # Multiplicar solo por escala_factor (que es 1.0) y tasa
             converted_data[key] = converted_value
         else:
             converted_data[key] = value 
@@ -359,7 +353,7 @@ if uploaded_files_streamlit:
                 year_str_from_key = parts[1] if len(parts) > 1 else None
                 
                 global_currency = data_from_gemini.get("Moneda", "N/A").upper()
-                global_unit = data_from_gemini.get("Unidad", "unidades")
+                # global_unit = data_from_gemini.get("Unidad", "unidades") # Ya no extraemos Unidad de Gemini
                 year_int = None
                 
                 try:
@@ -373,15 +367,14 @@ if uploaded_files_streamlit:
                     st.warning(f"Advertencia: Moneda o Año no identificados para {extracted_key}. Saltando conversión.")
                     continue
                 
-                st.write(f"Identificada moneda: {global_currency}, Año: {year_int}, Unidad: {global_unit} para {file_name_original_pdf} (Reporte {year_int}).")
+                st.write(f"Identificada moneda: {global_currency}, Año: {year_int} para {file_name_original_pdf} (Reporte {year_int}).")
                 
-                # Obtener los datos de BalanceGeneral y EstadoResultados directamente del JSON de Gemini
-                # y luego convertirlos
                 balance_data_raw = data_from_gemini.get("BalanceGeneral", {})
                 pnl_data_raw = data_from_gemini.get("EstadoResultados", {})
 
-                converted_balance_for_year = convert_to_usd(balance_data_raw, global_currency, year_int, global_unit) 
-                converted_pnl_for_year = convert_to_usd(pnl_data_raw, global_currency, year_int, global_unit)
+                # La función convert_to_usd ya no recibe 'unit'
+                converted_balance_for_year = convert_to_usd(balance_data_raw, global_currency, year_int) 
+                converted_pnl_for_year = convert_to_usd(pnl_data_raw, global_currency, year_int)
                 
                 if file_name_original_pdf not in _final_data_for_display:
                     _final_data_for_display[file_name_original_pdf] = {}
@@ -400,10 +393,8 @@ if uploaded_files_streamlit:
             all_balance_concepts_ordered = []
             for category_name, items_list in BALANCE_SHEET_STRUCTURE.items():
                 all_balance_concepts_ordered.append(category_name) 
-                # Si items_list es una lista de tuplas (nombre_estándar, [sinónimos])
                 if isinstance(items_list, list) and items_list and isinstance(items_list[0], tuple):
                     all_balance_concepts_ordered.extend([f"    {item_pair[0]}" for item_pair in items_list]) 
-                # Para el caso donde items_list podría ser solo [TOTAL_STRING]
                 elif isinstance(items_list, list):
                     all_balance_concepts_ordered.extend([f"    {item}" for item in items_list])
 
@@ -417,29 +408,24 @@ if uploaded_files_streamlit:
                     temp_column_data = pd.Series(index=all_balance_concepts_ordered, dtype=object)
 
                     for category_name_outer, items_list_outer in BALANCE_SHEET_STRUCTURE.items():
-                        # Primero, manejar el título de la categoría
                         if category_name_outer in balance_data_usd:
                             temp_column_data.loc[category_name_outer] = "" 
-                        
-                        # Luego, rellenar los ítems dentro de la categoría
-                        if isinstance(balance_data_usd.get(category_name_outer), dict): 
-                            for standard_item_name_tuple, _ in BALANCE_SHEET_STRUCTURE[category_name_outer]: 
-                                standard_item_name = standard_item_name_tuple 
-                                
-                                # Buscar el valor de la cuenta extraída por Gemini usando los sinónimos
-                                found_value = None
-                                for extracted_account_name_gemini, extracted_value_gemini in balance_data_usd[category_name_outer].items():
-                                    mapped_standard_name = BALANCE_SHEET_SYNONYMS.get(extracted_account_name_gemini.lower())
+                            if isinstance(balance_data_usd.get(category_name_outer), dict): 
+                                for standard_item_name_tuple, _ in BALANCE_SHEET_STRUCTURE[category_name_outer]: 
+                                    standard_item_name = standard_item_name_tuple 
                                     
-                                    if mapped_standard_name == standard_item_name:
-                                        found_value = extracted_value_gemini
-                                        break 
+                                    found_value = None
+                                    for extracted_account_name_gemini, extracted_value_gemini in balance_data_usd[category_name_outer].items():
+                                        mapped_standard_name = BALANCE_SHEET_SYNONYMS.get(extracted_account_name_gemini.lower())
+                                        
+                                        if mapped_standard_name == standard_item_name:
+                                            found_value = extracted_value_gemini
+                                            break 
                                     
-                                if found_value is not None:
-                                    temp_column_data.loc[f"    {standard_item_name}"] = found_value
+                                    if found_value is not None:
+                                        temp_column_data.loc[f"    {standard_item_name}"] = found_value
                                 
 
-                        # Para totales directos que no son diccionarios anidados (ej. TOTAL ACTIVOS)
                         elif isinstance(balance_data_usd.get(category_name_outer), (int, float)):
                             temp_column_data.loc[category_name_outer] = balance_data_usd[category_name_outer]
                     
