@@ -68,15 +68,11 @@ BALANCE_SHEET_STRUCTURE = {
 # Diccionario de sinónimos para facilitar el mapeo en el código
 BALANCE_SHEET_SYNONYMS = {}
 for main_category, items_list in BALANCE_SHEET_STRUCTURE.items():
-    if isinstance(items_list, list): # Si es una lista de tuplas (nombre estándar, [sinónimos])
-        for standard_name, synonyms in items_list:
-            for syn in synonyms:
-                BALANCE_SHEET_SYNONYMS[syn.lower()] = standard_name
-    else: # Si es una categoría principal sin sub-items directos, como TOTAL ACTIVOS
-        # Manejar el caso de las tuplas dentro de la lista para los totales
-        for standard_name, synonyms in items_list:
-            for syn in synonyms:
-                BALANCE_SHEET_SYNONYMS[syn.lower()] = standard_name
+    # Para TOTALES como "TOTAL ACTIVOS" la items_list es una lista de 1 tupla.
+    # Para categorías como "Activos Corrientes", items_list es una lista de varias tuplas.
+    for standard_name, synonyms in items_list: # Iterar sobre las tuplas (nombre estándar, [sinónimos])
+        for syn in synonyms:
+            BALANCE_SHEET_SYNONYMS[syn.lower()] = standard_name
 
 PNL_STANDARD_ITEMS_MAP = {
     "Ingresos por Ventas": ["Ingresos por Ventas", "Ventas Netas", "Ingresos Operacionales", "Ingresos"],
@@ -198,7 +194,7 @@ def extract_financial_data(uploaded_file_content_object, api_key):
             -   "Anticipos": valor
             -   "Impuestos Corrientes (Pasivo)": valor
             -   "Impuestos por pagar": valor
-            -   "Otros pasivos corrientes": valor
+            "Otros pasivos corrientes": valor
             "Total Pasivo Corriente": valor
         -   **Pasivos a Largo Plazo:** (Si no están explícitamente listados, omite esta sección.)
             -   "Préstamos y empréstitos no corrientes": valor
@@ -355,22 +351,9 @@ if uploaded_files_streamlit:
                 results_for_one_file = extract_financial_data(uploaded_file, GOOGLE_API_KEY)
                 total_extracted_results.update(results_for_one_file) 
 
+        _final_data_for_display = {} 
         if total_extracted_results: 
-            st.success("¡Datos extraídos y convertidos a USD con éxito!")
-
-            st.subheader("Balance General (Valores en USD)")
-            
-            all_balance_concepts_ordered = []
-            for category_name, items_list in BALANCE_SHEET_STRUCTURE.items():
-                all_balance_concepts_ordered.append(category_name) 
-                if category_name not in ["TOTAL ACTIVOS", "TOTAL PASIVOS", "TOTAL PASIVO Y PATRIMONIO"]:
-                    all_balance_concepts_ordered.extend([f"    {item}" for item in items_list]) 
-                else: 
-                    all_balance_concepts_ordered.extend([f"    {item}" for item in items_list if item != category_name]) 
-
-            df_balance_combined = pd.DataFrame(index=all_balance_concepts_ordered) 
-            
-            for extracted_key, data_from_gemini in total_extracted_results.items(): # Iteramos sobre las claves como 'nombre_archivo_año'
+            for extracted_key, data_from_gemini in total_extracted_results.items():
                 
                 parts = extracted_key.rsplit('_', 1) 
                 file_name_original_pdf = parts[0]
@@ -393,27 +376,56 @@ if uploaded_files_streamlit:
                 
                 st.write(f"Identificada moneda: {global_currency}, Año: {year_int}, Unidad: {global_unit} para {file_name_original_pdf} (Reporte {year_int}).")
                 
-                # Aquí la lógica de conversión ya se hizo en total_extracted_results (que es lo que viene de extract_financial_data)
-                # Necesitamos los datos de BalanceGeneral y EstadoResultados de data_from_gemini
-                
-                balance_data_usd = data_from_gemini.get("BalanceGeneral", {}) # Datos de balance directamente del JSON de Gemini
-                
-                col_name = f"Valor - {file_name_original_pdf} ({year_int})" # Columna incluirá nombre de archivo y año
-                temp_column_data = pd.Series(index=all_balance_concepts_ordered, dtype=object)
+                balance_data_for_year = data_from_gemini.get("BalanceGeneral", {})
+                pnl_data_for_year = data_from_gemini.get("EstadoResultados", {})
 
-                for category_name_outer, items_list_outer in BALANCE_SHEET_STRUCTURE.items():
-                    if category_name_outer in balance_data_usd:
-                        temp_column_data.loc[category_name_outer] = "" 
+                converted_balance_for_year = convert_to_usd(balance_data_for_year, global_currency, year_int, global_unit) 
+                converted_pnl_for_year = convert_to_usd(pnl_data_for_year, global_currency, year_int, global_unit)
+                
+                if file_name_original_pdf not in _final_data_for_display:
+                    _final_data_for_display[file_name_original_pdf] = {}
+                _final_data_for_display[file_name_original_pdf][year_int] = {
+                    "BalanceGeneralUSD": converted_balance_for_year,
+                    "EstadoResultadosUSD": converted_pnl_for_year
+                }
+        else:
+            st.warning("No se extrajeron datos válidos de ningún archivo para la conversión. Verifique el formato de los PDFs y el prompt.")
 
-                        if isinstance(balance_data_usd[category_name_outer], dict): 
-                            for item_name_inner in items_list_outer: 
-                                if item_name_inner in balance_data_usd[category_name_outer]:
-                                    temp_column_data.loc[f"    {item_name_inner}"] = balance_data_usd[category_name_outer][item_name_inner]
+        if _final_data_for_display: 
+            st.success("¡Datos extraídos y convertidos a USD con éxito!")
+
+            st.subheader("Balance General (Valores en USD)")
+            
+            all_balance_concepts_ordered = []
+            for category_name, items_list in BALANCE_SHEET_STRUCTURE.items():
+                all_balance_concepts_ordered.append(category_name) 
+                if category_name not in ["TOTAL ACTIVOS", "TOTAL PASIVOS", "TOTAL PASIVO Y PATRIMONIO"]:
+                    all_balance_concepts_ordered.extend([f"    {item}" for item in items_list]) 
+                else: 
+                    all_balance_concepts_ordered.extend([f"    {item}" for item in items_list if item != category_name]) 
+
+            df_balance_combined = pd.DataFrame(index=all_balance_concepts_ordered) 
+            
+            for file_name_original_pdf, file_years_data in _final_data_for_display.items():
+                for year, converted_data_for_year in sorted(file_years_data.items()): 
+                    balance_data_usd = converted_data_for_year.get("BalanceGeneralUSD", {})
+                    
+                    col_name = f"Valor - {file_name_original_pdf} ({year})" 
+                    temp_column_data = pd.Series(index=all_balance_concepts_ordered, dtype=object)
+
+                    for category_name_outer, items_list_outer in BALANCE_SHEET_STRUCTURE.items():
+                        if category_name_outer in balance_data_usd:
+                            temp_column_data.loc[category_name_outer] = "" 
+
+                            if isinstance(balance_data_usd[category_name_outer], dict): 
+                                for item_name_inner in items_list_outer: 
+                                    if item_name_inner in balance_data_usd[category_name_outer]:
+                                        temp_column_data.loc[f"    {item_name_inner}"] = balance_data_usd[category_name_outer][item_name_inner]
                         elif category_name_outer in balance_data_usd: 
                              temp_column_data.loc[category_name_outer] = balance_data_usd[category_name_outer]
                     
-                df_balance_combined[col_name] = temp_column_data 
-                
+                    df_balance_combined[col_name] = temp_column_data 
+                    
             for col in df_balance_combined.columns:
                 df_balance_combined[col] = df_balance_combined[col].apply(
                     lambda x: f"{x:,.2f}" if isinstance(x, (int, float)) else ("" if pd.isna(x) else x)
@@ -425,21 +437,17 @@ if uploaded_files_streamlit:
 
             df_pnl_combined = pd.DataFrame(index=PNL_STANDARD_ITEMS) 
 
-            for extracted_key, data_from_gemini in total_extracted_results.items(): # Re-iterar
-                parts = extracted_key.rsplit('_', 1) 
-                file_name_original_pdf = parts[0]
-                year_str_from_key = parts[1] if len(parts) > 1 else None
-                current_year_int = int(year_str_from_key) if year_str_from_key and year_str_from_key.isdigit() else None
+            for file_name_original_pdf, file_years_data in _final_data_for_display.items():
+                for year, converted_data_for_year in sorted(file_years_data.items()): 
+                    pnl_data_usd = converted_data_for_year.get("EstadoResultadosUSD", {})
 
-                pnl_data_usd = data_from_gemini.get("EstadoResultados", {}) # Datos de PnL directamente del JSON de Gemini
-
-                col_name = f"Valor - {file_name_original_pdf} ({current_year_int})" 
-                temp_column_data = pd.Series(index=PNL_STANDARD_ITEMS, dtype=object)
-                for item in PNL_STANDARD_ITEMS:
-                    if item in pnl_data_usd:
-                        temp_column_data.loc[item] = pnl_data_usd[item]
-                
-                df_pnl_combined[col_name] = temp_column_data
+                    col_name = f"Valor - {file_name_original_pdf} ({year})" 
+                    temp_column_data = pd.Series(index=PNL_STANDARD_ITEMS, dtype=object)
+                    for item in PNL_STANDARD_ITEMS:
+                        if item in pnl_data_usd:
+                            temp_column_data.loc[item] = pnl_data_usd[item]
+                    
+                    df_pnl_combined[col_name] = temp_column_data
                 
             for col in df_pnl_combined.columns:
                 df_pnl_combined[col] = df_pnl_combined[col].apply(
