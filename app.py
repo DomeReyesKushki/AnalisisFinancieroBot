@@ -5,7 +5,7 @@ import os
 import json
 import datetime
 import tempfile
-import io # Para exportar a Excel en memoria
+import io 
 
 # --- Configuración de la API de Gemini ---
 if "GOOGLE_API_KEY" in st.secrets:
@@ -17,7 +17,7 @@ else:
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# --- Estructura del Balance General (basada en la imagen proporcionada) ---
+# --- Estructura del Balance General (como en tu imagen) ---
 BALANCE_SHEET_STRUCTURE = {
     "Activos Corrientes": [
         "Inventarios",
@@ -118,7 +118,7 @@ def get_exchange_rate(currency_code, target_currency="USD", date=None):
         return 1.0 
 
 # --- Función de Extracción de Datos con Gemini ---
-@st.cache_data(show_spinner=False) # Cache para evitar re-procesar PDF si no cambia
+@st.cache_data(show_spinner=False) 
 def extract_financial_data(uploaded_file_content_object, api_key): 
     model = genai.GenerativeModel('gemini-1.5-flash') 
 
@@ -137,13 +137,14 @@ def extract_financial_data(uploaded_file_content_object, api_key):
         
         pdf_part = genai.upload_file(path=temp_file_path, display_name=file_name)
 
+        # PROMPT MEJORADO PARA IDENTIFICACIÓN DE MONEDA
         prompt = f"""
         Analiza cuidadosamente el siguiente documento PDF que contiene estados financieros.
 
         **Objetivo Principal:** Extraer los datos financieros del Balance General y del Estado de Pérdidas y Ganancias para CADA COLUMNA de DICIEMBRE (ej. "DICIEMBRE 2024", "DICIEMBRE 2023") que encuentres en el documento. Si no hay columnas de DICIEMBRE, entonces extrae los datos para las ÚLTIMAS 2 COLUMNAS de fecha disponibles (generalmente años fiscales).
 
         **Paso 1: Identificación de Moneda, Unidad de Magnitud y Años de Reporte.**
-        -   **Moneda Global:** Identifica la moneda principal (ej. "Pesos colombianos", "CLP$m", "MXN", "PEN", "EUR", "USD"). Extrae el código ISO o abreviatura más común (COP, CLP, MXN, PEN, EUR, USD).
+        -   **Moneda Global:** Identifica la moneda principal. Busca símbolos de moneda ($, €, S/, Bs), códigos ISO (USD, EUR, MXN, COP, CLP, PEN), o palabras como "Pesos Mexicanos", "Pesos Colombianos", "Soles Peruanos", "Dólares", "Euros". Si el documento menciona el país de la empresa (ej. "Mexico", "Colombia", "Chile"), infiere la moneda local si no está explícitamente definida (ej. "Mexico" -> MXN, "Colombia" -> COP, "Chile" -> CLP, "Perú" -> PEN). Extrae el código ISO o abreviatura más común (COP, CLP, MXN, USD, EUR, PEN). Si no se puede inferir con certeza, usa "USD" como valor por defecto.
         -   **Unidad Global (Escala):** Identifica la unidad de los valores. Si el documento dice "CLP$m", "US$m", "Expresado en millones", la unidad es "millones". Si dice "miles de pesos", la unidad es "miles". Si no indica, asume "unidades".
         -   **Años de Reporte:** Identifica TODOS los años de las columnas de DICIEMBRE disponibles (ej. 2024, 2023). Si no hay DICIEMBRE, identifica los años de las últimas 2 columnas de fecha disponibles.
 
@@ -290,8 +291,6 @@ def extract_financial_data(uploaded_file_content_object, api_key):
 
 
 def convert_to_usd(data_dict, currency_code, report_year, unit="unidades"):
-    converted_data = {}
-    
     scale_factor = 1.0
     if unit and isinstance(unit, str):
         unit_lower = unit.lower()
@@ -336,9 +335,22 @@ if uploaded_files_streamlit:
                 results_for_one_file = extract_financial_data(uploaded_file, GOOGLE_API_KEY)
                 total_extracted_results.update(results_for_one_file) 
 
-        _final_data_for_display = {} 
         if total_extracted_results: 
-            for extracted_key, data_from_gemini in total_extracted_results.items():
+            st.success("¡Datos extraídos y convertidos a USD con éxito!")
+
+            st.subheader("Balance General (Valores en USD)")
+            
+            all_balance_concepts_ordered = []
+            for category_name, items_list in BALANCE_SHEET_STRUCTURE.items():
+                all_balance_concepts_ordered.append(category_name) 
+                if category_name not in ["TOTAL ACTIVOS", "TOTAL PASIVOS", "TOTAL PASIVO Y PATRIMONIO"]:
+                    all_balance_concepts_ordered.extend([f"    {item}" for item in items_list]) 
+                else: 
+                    all_balance_concepts_ordered.extend([f"    {item}" for item in items_list if item != category_name]) 
+
+            df_balance_combined = pd.DataFrame(index=all_balance_concepts_ordered) 
+            
+            for extracted_key, data_from_gemini in total_extracted_results.items(): # Iteramos sobre las claves como 'nombre_archivo_año'
                 
                 parts = extracted_key.rsplit('_', 1) 
                 file_name_original_pdf = parts[0]
@@ -359,58 +371,27 @@ if uploaded_files_streamlit:
                     st.warning(f"Advertencia: Moneda o Año no identificados para {extracted_key}. Saltando conversión.")
                     continue
                 
-                st.write(f"Identificada moneda: {global_currency}, Año: {year_int}, Unidad: {global_unit} para {file_name_original_pdf} (Reporte {year_int}).")
+                # OJO: La conversión a USD ya se hizo al llenar _final_data_for_display en la Celda 4
+                # Aquí, necesitamos los datos ya convertidos de `total_extracted_results`
                 
-                balance_data_for_year = data_from_gemini.get("BalanceGeneral", {})
-                pnl_data_for_year = data_from_gemini.get("EstadoResultados", {})
-
-                converted_balance_for_year = convert_to_usd(balance_data_for_year, global_currency, year_int, global_unit) 
-                converted_pnl_for_year = convert_to_usd(pnl_data_for_year, global_currency, year_int, global_unit)
+                balance_data_usd = data_from_gemini.get("BalanceGeneralUSD", {}) # ¡Corregido! Acceder directamente
                 
-                if file_name_original_pdf not in _final_data_for_display:
-                    _final_data_for_display[file_name_original_pdf] = {}
-                _final_data_for_display[file_name_original_pdf][year_int] = {
-                    "BalanceGeneralUSD": converted_balance_for_year,
-                    "EstadoResultadosUSD": converted_pnl_for_year
-                }
-        else:
-            st.warning("No se extrajeron datos válidos de ningún archivo para la conversión. Verifique el formato de los PDFs y el prompt.")
+                col_name = f"Valor - {file_name_original_pdf} ({year_int})" # Columna incluirá nombre de archivo y año
+                temp_column_data = pd.Series(index=all_balance_concepts_ordered, dtype=object)
 
-        if _final_data_for_display: 
-            st.success("¡Datos extraídos y convertidos a USD con éxito!")
+                for category_name_outer, items_list_outer in BALANCE_SHEET_STRUCTURE.items():
+                    if category_name_outer in balance_data_usd:
+                        temp_column_data.loc[category_name_outer] = "" 
 
-            st.subheader("Balance General (Valores en USD)")
-            
-            all_balance_concepts_ordered = []
-            for category_name, items_list in BALANCE_SHEET_STRUCTURE.items():
-                all_balance_concepts_ordered.append(category_name) 
-                if category_name not in ["TOTAL ACTIVOS", "TOTAL PASIVOS", "TOTAL PASIVO Y PATRIMONIO"]:
-                    all_balance_concepts_ordered.extend([f"    {item}" for item in items_list]) 
-                else: 
-                    all_balance_concepts_ordered.extend([f"    {item}" for item in items_list if item != category_name]) 
-
-            df_balance_combined = pd.DataFrame(index=all_balance_concepts_ordered) 
-            
-            for file_name_original_pdf, file_years_data in _final_data_for_display.items():
-                for year, converted_data_for_year in sorted(file_years_data.items()): 
-                    balance_data_usd = converted_data_for_year.get("BalanceGeneralUSD", {})
-                    
-                    col_name = f"Valor - {file_name_original_pdf} ({year})" 
-                    temp_column_data = pd.Series(index=all_balance_concepts_ordered, dtype=object)
-
-                    for category_name_outer, items_list_outer in BALANCE_SHEET_STRUCTURE.items():
-                        if category_name_outer in balance_data_usd:
-                            temp_column_data.loc[category_name_outer] = "" 
-
-                            if isinstance(balance_data_usd[category_name_outer], dict): 
-                                for item_name_inner in items_list_outer: 
-                                    if item_name_inner in balance_data_usd[category_name_outer]:
-                                        temp_column_data.loc[f"    {item_name_inner}"] = balance_data_usd[category_name_outer][item_name_inner]
+                        if isinstance(balance_data_usd[category_name_outer], dict): 
+                            for item_name_inner in items_list_outer: 
+                                if item_name_inner in balance_data_usd[category_name_outer]:
+                                    temp_column_data.loc[f"    {item_name_inner}"] = balance_data_usd[category_name_outer][item_name_inner]
                         elif category_name_outer in balance_data_usd: 
                              temp_column_data.loc[category_name_outer] = balance_data_usd[category_name_outer]
                     
-                    df_balance_combined[col_name] = temp_column_data 
-                    
+                df_balance_combined[col_name] = temp_column_data 
+                
             for col in df_balance_combined.columns:
                 df_balance_combined[col] = df_balance_combined[col].apply(
                     lambda x: f"{x:,.2f}" if isinstance(x, (int, float)) else ("" if pd.isna(x) else x)
@@ -422,17 +403,21 @@ if uploaded_files_streamlit:
 
             df_pnl_combined = pd.DataFrame(index=PNL_STANDARD_ITEMS) 
 
-            for file_name_original_pdf, file_years_data in _final_data_for_display.items():
-                for year, converted_data_for_year in sorted(file_years_data.items()): 
-                    pnl_data_usd = converted_data_for_year.get("EstadoResultadosUSD", {})
+            for extracted_key, data_from_gemini in total_extracted_results.items(): # Re-iterar
+                parts = extracted_key.rsplit('_', 1) 
+                file_name_original_pdf = parts[0]
+                year_str_from_key = parts[1] if len(parts) > 1 else None
+                current_year_int = int(year_str_from_key) if year_str_from_key and year_str_from_key.isdigit() else None
 
-                    col_name = f"Valor - {file_name_original_pdf} ({year})" 
-                    temp_column_data = pd.Series(index=PNL_STANDARD_ITEMS, dtype=object)
-                    for item in PNL_STANDARD_ITEMS:
-                        if item in pnl_data_usd:
-                            temp_column_data.loc[item] = pnl_data_usd[item]
-                    
-                    df_pnl_combined[col_name] = temp_column_data
+                pnl_data_usd = data_from_gemini.get("EstadoResultadosUSD", {}) # ¡Corregido! Acceder directamente
+
+                col_name = f"Valor - {file_name_original_pdf} ({current_year_int})" 
+                temp_column_data = pd.Series(index=PNL_STANDARD_ITEMS, dtype=object)
+                for item in PNL_STANDARD_ITEMS:
+                    if item in pnl_data_usd:
+                        temp_column_data.loc[item] = pnl_data_usd[item]
+                
+                df_pnl_combined[col_name] = temp_column_data
                 
             for col in df_pnl_combined.columns:
                 df_pnl_combined[col] = df_pnl_combined[col].apply(
