@@ -24,7 +24,7 @@ BALANCE_SHEET_STRUCTURE = {
         ("Efectivo y equivalentes de efectivo", ["Efectivo y equivalentes de efectivo", "Efectivo y depósitos", "Bancos", "Caja", "Caja y Bancos"]), 
         ("Cuentas por cobrar", ["Cuentas por cobrar", "Clientes", "Deudores", "Cuentas por cobrar comerciales", "Cuentas por cobrar a empresas relacionadas CP", "Deudores diversos"]), 
         ("Gasto Anticipado", ["Gasto Anticipado", "Gastos pagados por anticipado", "Pagos anticipados"]), 
-        ("Otros activos", ["Otros activos", "Otros activos corrientes", "Activos por Impuestos", "Otros Activos", "Activos financieros"]), 
+        ("Otros activos", ["Otros activos", "Otros activos corrientes", "Activos por Impuestos", "Otros Activos", "Activos financieros"]), # Añadido Activos financieros aquí
         ("Total Activo Corriente", ["Total Activo Corriente", "Total Activo a Corto Plazo", "Total Activo Corriente Netos"]) 
     ],
     "Activos No Corrientes": [
@@ -33,32 +33,32 @@ BALANCE_SHEET_STRUCTURE = {
         ("Otros Activos No Corrientes", ["Otros Activos No Corrientes", "Activos diferidos", "Otros activos no corrientes", "Activos a largo plazo"]),
         ("Total Activo No Corriente", ["Total Activo No Corriente", "Total Activo Fijo", "Total Activo a largo plazo"]) 
     ],
-    "TOTAL ACTIVOS": [("TOTAL ACTIVOS", ["TOTAL ACTIVOS", "Total Activo", "SUMA DEL ACTIVO"])], 
+    "TOTAL ACTIVOS": [("TOTAL ACTIVOS", ["TOTAL ACTIVOS", "Total Activo", "SUMA DEL ACTIVO"])], # Añadido SUMA DEL ACTIVO
     "Pasivos a Corto Plazo": [
         ("Préstamos y empréstitos corrientes", ["Préstamos y empréstitos corrientes", "Préstamos bancarios a corto plazo"]),
         ("Obligaciones Financieras", ["Obligaciones Financieras", "Préstamos"]), 
-        ("Cuentas comerciales y otras cuentas por pagar", ["Cuentas comerciales y otras cuentas por pagar", "Acreedores diversos", "Proveedores"]), 
+        ("Cuentas comerciales y otras cuentas por pagar", ["Cuentas comerciales y otras cuentas por pagar", "Acreedores diversos", "Proveedores"]), # Añadido Proveedores
         ("Cuentas por Pagar", ["Cuentas por Pagar", "Proveedores"]), 
-        ("Pasivo Laborales", ["Pasivo Laborales", "Provisiones para sueldos y salarios", "Remuneraciones por pagar", "Provisión de sueldos y salarios x pagar", "Provisión de contribuciones segsocial x pagar"]), 
+        ("Pasivo Laborales", ["Pasivo Laborales", "Provisiones para sueldos y salarios", "Remuneraciones por pagar", "Provisión de sueldos y salarios x pagar", "Provisión de contribuciones segsocial x pagar"]), # Añadido sinónimos específicos
         ("Anticipos", ["Anticipos", "Anticipos de clientes"]), 
-        ("Impuestos Corrientes (Pasivo)", ["Impuestos Corrientes (Pasivo)", "Impuestos por pagar", "Pasivo por impuestos", "Impuestos trasladados cobrados", "Impuestos trasladados no cobrados", "Impuestos y derechos por pagar"]), 
+        ("Impuestos Corrientes (Pasivo)", ["Impuestos Corrientes (Pasivo)", "Impuestos por pagar", "Pasivo por impuestos", "Impuestos trasladados cobrados", "Impuestos trasladados no cobrados", "Impuestos y derechos por pagar"]), # Añadido sinónimos específicos
         ("Otros pasivos corrientes", ["Otros pasivos corrientes"]),
         ("Total Pasivo Corriente", ["Total Pasivo Corriente", "Total Pasivo a Corto Plazo"]) 
     ],
     "Pasivos a Largo Plazo": [
         ("Préstamos y empréstitos no corrientes", ["Préstamos y empréstitos no corrientes", "Préstamos bancarios a largo plazo"]),
         ("Obligaciones Financieras No Corrientes", ["Obligaciones Financieras No Corrientes", "Obligaciones Financieras"]), 
-        ("Anticipos y Avances Recibidos", ["Anticipos y Avances Recibidos", "Depósitos en garantía"]), 
+        ("Anticipos y Avances Recibidos", ["Anticipos y Avances Recibidos", "Depósitos en garantía"]), # Añadido Depósitos en garantía
         ("Otros pasivos no corrientes", ["Otros pasivos no corrientes", "Ingresos diferidos"]),
         ("Total Pasivo No Corriente", ["Total Pasivo No Corriente", "Total Pasivo a largo plazo"]) 
     ],
-    "TOTAL PASIVOS": [("TOTAL PASIVOS", ["TOTAL PASIVOS", "Total Pasivo", "SUMA DEL PASIVO"])], 
+    "TOTAL PASIVOS": [("TOTAL PASIVOS", ["TOTAL PASIVOS", "Total Pasivo", "SUMA DEL PASIVO"])], # Añadido SUMA DEL PASIVO
     "Patrimonio Atribuible a los Propietarios de la Matriz": [
         ("Capital social", ["Capital social", "Capital Emitido", "Capital Social"]), 
         ("Aportes Para Futuras Capitalizaciones", ["Aportes Para Futuras Capitalizaciones"]), 
         ("Resultados Ejerc. Anteriores", ["Resultados Ejerc. Anteriores", "Ganancias retenidas"]), 
         ("Resultado del Ejercicio", ["Resultado del Ejercicio", "Utilidad del período", "Utilidad o Pérdida del Ejercicio"]), 
-        ("Otros componentes del patrimonio", ["Otros componentes del patrimonio", "Otras reservas", "Patrimonio Minoritario", "Impuestos retenidos"]), 
+        ("Otros componentes del patrimonio", ["Otros componentes del patrimonio", "Otras reservas", "Patrimonio Minoritario", "Impuestos retenidos"]), # Impuestos retenidos como patrimonio negativo
         ("TOTAL PATRIMONIO", ["TOTAL PATRIMONIO", "Total Patrimonio", "SUMA DEL CAPITAL"]) 
     ],
     "TOTAL PASIVO Y PATRIMONIO": [("TOTAL PASIVO Y PATRIMONIO", ["TOTAL PASIVO Y PATRIMONIO", "Total Pasivo y Patrimonio", "SUMA DEL PASIVO Y CAPITAL"])] 
@@ -316,7 +316,7 @@ def convert_to_usd(data_dict, currency_code, report_year, unit="unidades"):
     
     st.write(f"DEBUG: Conversión - Moneda: {currency_code}, Año: {report_year}, Unidad: {unit}, Factor Escala: {scale_factor}, Tasa USD: {exchange_rate}")
 
-    converted_data = {} # Aseguramos inicialización
+    converted_data = {} 
     for key, value in data_dict.items():
         if isinstance(value, dict):
             converted_data[key] = convert_to_usd(value, currency_code, report_year, unit) 
@@ -420,9 +420,9 @@ if uploaded_files_streamlit:
                         
                         # Luego, rellenar los ítems dentro de la categoría
                         if isinstance(balance_data_usd.get(category_name_outer), dict): # Si la categoría tiene sub-items (es un diccionario)
-                            for standard_item_name_tuple, _ in BALANCE_SHEET_STRUCTURE[category_name_outer]: # Iterar sobre el estándar para el orden (ej. ("Efectivo y equivalentes de efectivo", [...]))
+                            for standard_item_name_tuple, _ in BALANCE_SHEET_STRUCTURE[category_name_outer]: # Iterar sobre el nombre estándar para el orden (ej. ("Efectivo y equivalentes de efectivo", [...]))
                                 # Asegurar que el nombre estándar es el primer elemento de la tupla
-                                standard_item_name = standard_item_name_tuple # Ya es el nombre estándar
+                                standard_item_name = standard_item_name_tuple 
                                 
                                 # Buscar el valor de la cuenta extraída por Gemini usando los sinónimos
                                 found_value = None
@@ -433,11 +433,11 @@ if uploaded_files_streamlit:
                                     
                                     if mapped_standard_name == standard_item_name:
                                         found_value = extracted_value_gemini
-                                        break # Encontramos el valor para este estándar
+                                        break 
                                     
                                 if found_value is not None:
                                     temp_column_data.loc[f"    {standard_item_name}"] = found_value
-                                # else: temp_column_data.loc[f"    {standard_item_name}"] = "" # Si no se encuentra, se quedará como None (NaN)
+                                
 
                         # Para totales directos que no son diccionarios anidados (ej. TOTAL ACTIVOS)
                         elif isinstance(balance_data_usd.get(category_name_outer), (int, float)):
@@ -463,7 +463,7 @@ if uploaded_files_streamlit:
                     col_name = f"Valor - {file_name_original_pdf} ({year})" 
                     temp_column_data = pd.Series(index=list(PNL_STANDARD_ITEMS_MAP.keys()), dtype=object) 
                     
-                    for standard_item_name in PNL_STANDARD_ITEMS_MAP.keys(): # Iterar sobre el estándar PNL
+                    for standard_item_name in PNL_STANDARD_ITEMS_MAP.keys(): 
                         found_value = None
                         for extracted_account_name_gemini, extracted_value_gemini in pnl_data_usd.items():
                             mapped_standard_name = PNL_SYNONYMS.get(extracted_account_name_gemini.lower())
