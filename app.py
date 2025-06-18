@@ -70,14 +70,13 @@ BALANCE_SHEET_STANDARD_CONCEPTS = [
     "TOTAL PASIVO Y PATRIMONIO"
 ]
 
-# Mapeo de sinónimos (llave es sinónimo.lower(), valor es el nombre estándar)
-# Este diccionario se usará en Python para mapear lo que Gemini extrae a tus categorías estándar
+# Diccionario de sinónimos para facilitar el mapeo en el código (llave es sinónimo.lower(), valor es el nombre estándar)
 BALANCE_SHEET_SYNONYMS = {
     "inventarios": "Inventarios", "inventario equipos": "Inventarios",
     "efectivo y equivalentes de efectivo": "Efectivo y equivalentes de efectivo", "efectivo y depósitos": "Efectivo y equivalentes de efectivo", "bancos": "Efectivo y equivalentes de efectivo", "caja": "Efectivo y equivalentes de efectivo", "fondo fijo de caja": "Efectivo y equivalentes de efectivo", "caja y bancos": "Efectivo y equivalentes de efectivo",
     "cuentas por cobrar": "Cuentas por cobrar", "clientes": "Cuentas por cobrar", "deudores": "Cuentas por cobrar", "cuentas por cobrar comerciales": "Cuentas por cobrar", "cuentas por cobrar a empresas relacionadas cp": "Cuentas por cobrar a empresas relacionadas CP", "deudores diversos": "Cuentas por cobrar",
     "gasto anticipado": "Gasto Anticipado", "gastos pagados por anticipado": "Gasto Anticipado", "pagos anticipados": "Gasto Anticipado", "impuestos a favor": "Gasto Anticipado", "pagos provisionales": "Gasto Anticipado",
-    "otros activos": "Otros activos", "otros activos corrientes": "Otros activos", "activos por impuestos": "Otros activos", "activos financieros": "Otros activos", # Para Activos Corrientes
+    "otros activos": "Otros activos", "otros activos corrientes": "Otros activos", "activos por impuestos": "Otros activos", "activos financieros": "Otros activos", "otros activos":"Otros activos", 
 
     "propiedad, planta y equipo": "Propiedad, planta y equipo", "propiedad planta y equipo": "Propiedad, planta y equipo", "activo fijo": "Propiedad, planta y equipo", "activo fijo neto": "Propiedad, planta y equipo",
     "intangibles (software)": "Intangibles (Software)", "intangibles": "Intangibles (Software)",
@@ -108,7 +107,7 @@ BALANCE_SHEET_SYNONYMS = {
     "capital social": "Capital social", "capital emitido": "Capital social",
     "aportes para futuras capitalizaciones": "Aportes Para Futuras Capitalizaciones",
     "resultados ejerc. anteriores": "Resultados Ejerc. Anteriores", "ganancias retenidas": "Resultados Ejerc. Anteriores",
-    "resultado del ejercicio": "Resultado del Ejercicio", "utilidad del período": "Resultado del Ejercicio", "utilidad o pérdida del ejercicio": "Resultado del Ejercicio",
+    "resultado del ejercicio": "Resultado del Ejercicio", "utilidad del período": "Resultado del Ejercicio", "utilidad o pérdida del ejercicio": "Resultado del Ejercicio", "utilidad o pérdida del ejercicio": "Resultado del Ejercicio", # Duplicado, corregir si no es intencional
     "otros componentes del patrimonio": "Otros componentes del patrimonio", "otras reservas": "Otros componentes del patrimonio", "patrimonio minoritario": "Otros componentes del patrimonio", "impuestos retenidos": "Otros componentes del patrimonio", 
     "total patrimonio": "TOTAL PATRIMONIO", "suma del capital": "TOTAL PATRIMONIO",
 
@@ -122,12 +121,12 @@ PNL_STANDARD_CONCEPTS = [
 ]
 
 PNL_SYNONYMS = {
-    "ingresos por ventas": "Ingresos por Ventas", "ventas netas": "Ingresos por Ventas", "ingresos operacionales": "Ingresos por Ventas", "ingresos": "Ingresos por Ventas",
-    "costo de ventas": "Costo de Ventas", "costo de bienes vendidos": "Costo de Ventas", "costos": "Costo de Ventas",
-    "ganancia bruta": "Ganancia Bruta", "margen bruto": "Ganancia Bruta", 
-    "gastos de operación": "Gastos de Operación", "gastos de administración": "Gastos de Operación", "gastos de venta": "Gastos de Operación", "gastos operacionales": "Gastos de Operación", "gastos generales": "Gastos de Operación",
-    "ganancia (pérdida) de operación": "Ganancia (Pérdida) de Operación", "utilidad operacional": "Ganancia (Pérdida) de Operación", "ebitda": "Ganancia (Pérdida) de Operación", "utilidad (o pérdida)": "Ganancia (Pérdida) de Operación",
-    "ingresos (gastos) financieros": "Ingresos (Gastos) Financieros", "gastos financieros": "Ingresos (Gastos) Financieros", "ingresos financieros": "Ingresos (Gastos) Financieros", "resultado integral de financiamiento": "Ingresos (Gastos) Financieros",
+    "ingresos por ventas": "Ingresos por Ventas", "ventas netas": "Ingresos por Ventas", "ingresos operacionales": "Ingresos por Ventas", "ingresos": "Ingresos por Ventas", "total ingresos": "Ingresos por Ventas", # Añadido "Total Ingresos"
+    "costo de ventas": "Costo de Ventas", "costo de bienes vendidos": "Costo de Ventas", "costos": "Costo de Ventas", "total costos": "Costo de Ventas", # Añadido "Total Costos"
+    "ganancia bruta": "Ganancia Bruta", "margen bruto": "Ganancia Bruta", "utilidad bruta": "Ganancia Bruta", # Añadido "Utilidad Bruta"
+    "gastos de operación": "Gastos de Operación", "gastos de administración": "Gastos de Operación", "gastos de venta": "Gastos de Operación", "gastos operacionales": "Gastos de Operación", "gastos generales": "Gastos de Operación", "total gasto de operación": "Gastos de Operación", # Añadido "Total Gasto de Operación"
+    "ganancia (pérdida) de operación": "Ganancia (Pérdida) de Operación", "utilidad operacional": "Ganancia (Pérdida) de Operación", "ebitda": "Ganancia (Pérdida) de Operación", "utilidad (o pérdida)": "Ganancia (Pérdida) de Operación", "utilidad de operación": "Ganancia (Pérdida) de Operación", # Añadido "Utilidad de Operación"
+    "ingresos (gastos) financieros": "Ingresos (Gastos) Financieros", "gastos financieros": "Ingresos (Gastos) Financieros", "ingresos financieros": "Ingresos (Gastos) Financieros", "resultado integral de financiamiento": "Ingresos (Gastos) Financieros", "total gtos y prod financ": "Ingresos (Gastos) Financieros", # Añadido "Total Gtos y Prod Financ"
     "impuesto a la renta": "Impuesto a la Renta", "gasto por impuestos": "Impuesto a la Renta", "impuesto sobre la renta": "Impuesto a la Renta",
     "ganancia (pérdida) neta": "Ganancia (Pérdida) Neta", "utilidad neta": "Ganancia (Pérdida) Neta", "resultado del período": "Ganancia (Pérdida) Neta", "resultado del ejercicio": "Ganancia (Pérdida) Neta"
 }
@@ -309,6 +308,7 @@ def extract_financial_data(uploaded_file_content_object, api_key):
                     extracted_data_key = f"{file_name}_{year_str}" 
                     extracted_data_for_file[extracted_data_key] = { 
                         "Moneda": global_currency,
+                        # "Unidad": global_unit, # Ya no se usa la unidad de Gemini aquí
                         "AnioInforme": year_str, 
                         "BalanceGeneral": report_entry.get("BalanceGeneral", {}),
                         "EstadoResultados": report_entry.get("EstadoResultados", {})
@@ -330,9 +330,10 @@ def extract_financial_data(uploaded_file_content_object, api_key):
 
     return extracted_data_for_file 
 
-# --- Función auxiliar para aplicar el scale_factor a los números del JSON extraído (NO SE USA DIRECTAMENTE EN convert_to_usd AHORA) ---
-def apply_scale_factor_to_raw_data(data_dict, unit):
-    scaled_dict = {}
+
+# Función auxiliar para aplicar el scale_factor a los números del JSON extraído (ANTES de conversión USD)
+def apply_scale_factor_to_raw_data(data_nested, unit):
+    scaled_data = {}
     scale_factor = 1.0
     if unit and isinstance(unit, str):
         unit_lower = unit.lower()
@@ -341,26 +342,28 @@ def apply_scale_factor_to_raw_data(data_dict, unit):
         elif "miles" in unit_lower:
             scale_factor = 1_000.0
     
-    for k, v in data_dict.items():
-        if isinstance(v, dict):
-            scaled_dict[k] = apply_scale_factor_to_raw_data(v, unit)
-        elif isinstance(v, (int, float)):
-            scaled_dict[k] = v * scale_factor
+    for key, value in data_nested.items():
+        if isinstance(value, dict):
+            scaled_data[key] = apply_scale_factor_to_raw_data(value, unit) # Recursión para secciones anidadas
+        elif isinstance(value, (int, float)):
+            scaled_data[key] = value * scale_factor # Aplicar factor de escala aquí
         else:
-            scaled_dict[k] = v
-    return scaled_dict
+            scaled_data[key] = value
+    return scaled_data
 
-# --- Función auxiliar para mapear y agregar cuentas de Balance General ---
+# Función auxiliar para mapear y agregar cuentas de Balance General
 def map_and_aggregate_balance(raw_balance_data_nested, synonyms_map):
     # raw_balance_data_nested es el diccionario que viene directamente del JSON de Gemini para BalanceGeneral
     # Ejemplo: {'ACTIVOS': {'Activo Corriente': {'FONDO FIJO DE CAJA': 699.1, 'BANCOS': 287341.76, ...}}}
     
-    aggregated_data = {concept: 0.0 for concept in BALANCE_SHEET_STANDARD_CONCEPTS}
+    # Inicializar el diccionario con las categorías estándar del Balance General a 0.0
+    # No incluir los títulos de categoría aquí si no van a tener un valor directo sumado.
+    aggregated_data = {concept: 0.0 for concept in [item[0] for category_list in BALANCE_SHEET_STRUCTURE.values() for item in category_list]}
     
-    # Recorrer las secciones principales (ACTIVOS, PASIVOS, CAPITAL)
-    for main_section_name, main_section_content in raw_balance_data_nested.items():
-        if isinstance(main_section_content, dict): # Si es una sección con sub-secciones (ej. "ACTIVOS")
-            for sub_section_name, sub_section_content in main_section_content.items():
+    # Recorrer las secciones principales (ACTIVOS, PASIVOS, CAPITAL) y sus sub-secciones
+    for section_name_outer, section_content_outer in raw_balance_data_nested.items():
+        if isinstance(section_content_outer, dict): # Si es una sección con sub-secciones (ej. "ACTIVOS")
+            for sub_section_name, sub_section_content in section_content_outer.items():
                 if isinstance(sub_section_content, dict): # Si es una sub-sección con cuentas detalladas (ej. "Activo Corriente")
                     for account_name_raw, value_raw in sub_section_content.items():
                         if value_raw is not None and isinstance(value_raw, (int, float)):
@@ -369,26 +372,20 @@ def map_and_aggregate_balance(raw_balance_data_nested, synonyms_map):
                                 aggregated_data[mapped_name] += value_raw
                             else:
                                 st.warning(f"Advertencia: Cuenta BG detallada '{account_name_raw}' no mapeada a estándar. Valor: {value_raw}")
-                elif isinstance(main_section_content, (int, float)): # Para totales directos de sección (ej. "TOTAL ACTIVO CIRCULANTE" si estuviera al mismo nivel)
-                    mapped_name = synonyms_map.get(main_section_name.lower())
-                    if mapped_name:
-                        aggregated_data[mapped_name] += main_section_content 
+                # Manejar totales de sub-sección si están directamente bajo la sección principal (ej. "TOTAL ACTIVO CIRCULANTE")
+                elif isinstance(section_content_outer, (int, float)):
+                    mapped_name = synonyms_map.get(section_name_outer.lower())
+                    if mapped_name and mapped_name in aggregated_data: # Solo si mapea a una cuenta estándar existente
+                        aggregated_data[mapped_name] += section_content_outer
                     else:
-                        st.warning(f"Advertencia: Total BG de sub-sección '{main_section_name}' no mapeado. Valor: {main_section_content}")
-        elif isinstance(main_section_content, (int, float)): # Para los TOTALES de nivel superior (ej. "TOTAL ACTIVOS" si está directamente bajo BalanceGeneral)
-            mapped_name = synonyms_map.get(main_section_name.lower())
-            if mapped_name:
-                aggregated_data[mapped_name] = main_section_content # Se sobrescribe porque es un total directo
+                        st.warning(f"Advertencia: Total BG de sub-sección '{section_name_outer}' no mapeado. Valor: {section_content_outer}")
+        # Manejar los TOTALES de nivel superior (ej. "TOTAL ACTIVOS", "TOTAL PASIVOS")
+        elif isinstance(section_content_outer, (int, float)):
+            mapped_name = synonyms_map.get(section_name_outer.lower())
+            if mapped_name and mapped_name in aggregated_data:
+                aggregated_data[mapped_name] = section_content_outer # Estos son totales, no se suman a otros
             else:
-                st.warning(f"Advertencia: Total BG de nivel superior '{main_section_name}' no mapeado. Valor: {main_section_content}")
-    
-    # Asegurarse de que los totales principales que pueden estar en el nivel superior del BalanceGeneral de Gemini se mapeen
-    # Ej: "TOTAL ACTIVOS"
-    for total_concept_key in ["TOTAL ACTIVOS", "TOTAL PASIVOS", "TOTAL PATRIMONIO", "TOTAL PASIVO Y PATRIMONIO"]:
-        if total_concept_key in raw_balance_data_nested and isinstance(raw_balance_data_nested[total_concept_key], (int, float)):
-            mapped_name = synonyms_map.get(total_concept_key.lower())
-            if mapped_name:
-                aggregated_data[mapped_name] = raw_balance_data_nested[total_concept_key] # Usar el total directo
+                st.warning(f"Advertencia: Total BG de nivel superior '{section_name_outer}' no mapeado. Valor: {section_content_outer}")
     
     return aggregated_data
 
@@ -408,16 +405,18 @@ def map_and_aggregate_pnl(raw_pnl_data_nested, synonyms_map):
                         aggregated_data[mapped_name] += value_raw
                     else:
                         st.warning(f"Advertencia: Cuenta PnL detallada '{account_name_raw}' no mapeada a estándar. Valor: {value_raw}")
-        elif isinstance(section_content, (int, float)): # Para los totales directos de PnL (ej. "UTILIDAD BRUTA")
+        elif isinstance(section_content, (int, float)): # Para los totales directos de PnL (ej. Ganancia Bruta, Utilidad Bruta)
             mapped_name = synonyms_map.get(section_name.lower())
-            if mapped_name:
-                aggregated_data[mapped_name] = section_content 
+            if mapped_name and mapped_name in aggregated_data:
+                aggregated_data[mapped_name] = section_content # Estos son totales, se sobrescriben
             else:
                 st.warning(f"Advertencia: Total PnL de sección '{section_name}' no mapeado. Valor: {section_content}")
 
     return aggregated_data
 
 def convert_to_usd(data_dict, currency_code, report_year): 
+    # Esta función ahora asume que data_dict ya tiene la escala aplicada (miles/millones)
+    
     exchange_rate = get_exchange_rate(currency_code, date=report_year)
     
     st.write(f"DEBUG: Conversión - Moneda: {currency_code}, Año: {report_year}, Tasa USD: {exchange_rate}")
@@ -464,13 +463,18 @@ if uploaded_files_streamlit:
                 year_str_from_key = parts[1] if len(parts) > 1 else None
                 
                 global_currency = data_from_gemini.get("Moneda", "N/A").upper()
-                # La unidad ya no viene de Gemini en el JSON final, la inferimos de los datos o asumimos
-                # Sin embargo, el prompt le pide a Gemini que los valores YA estén en unidades completas.
-                # Si el PDF dice CLP$m, Gemini debe dar el valor multiplicado por 1,000,000.
-                # Si no dice nada, Gemini da el valor tal cual.
-                # Por lo tanto, no necesitamos un 'unit' en la función convert_to_usd
-                # Pero si lo queremos para debug, podemos inferirlo aquí
+                # La unidad ya no viene de Gemini. La inferiremos para aplicar el scale_factor.
+                # Para esto, debemos re-leer la unidad del JSON para el scaling
+                # En este punto, Gemini solo devuelve el número 'tal cual'.
+                # La inferencia de la unidad (miles/millones) se basará en el contexto.
                 
+                # Por el momento, si no hay campo 'Unidad' en el JSON, la asumiremos 'unidades'
+                # Si el prompt no devuelve "Unidad", debemos inferirla del nombre del archivo o del contexto
+                # O bien, Streamlit puede preguntar al usuario
+                # Para simplificar AHORA, si no está en el JSON, asumimos "unidades"
+                global_unit = "unidades" 
+                # Si el prompt de Celda 2 realmente no devuelve "Unidad", esta línea es clave.
+
                 year_int = None
                 try:
                     if year_str_from_key:
@@ -485,15 +489,34 @@ if uploaded_files_streamlit:
                 
                 st.write(f"Identificada moneda: {global_currency}, Año: {year_int} para {file_name_original_pdf} (Reporte {year_int}).")
                 
+                # Obtener los datos crudos de BalanceGeneral y EstadoResultados de Gemini
                 balance_data_raw = data_from_gemini.get("BalanceGeneral", {})
                 pnl_data_raw = data_from_gemini.get("EstadoResultados", {})
 
-                # NO APLICAMOS EL FACTOR DE ESCALA AQUÍ, SE ASUME QUE GEMINI YA DIÓ EL VALOR EN UNIDADES COMPLETAS
-                # Pero sí debemos mapear y agregar las cuentas de detalle AHORA
-                aggregated_balance_data = map_and_aggregate_balance(balance_data_raw, BALANCE_SHEET_SYNONYMS)
-                aggregated_pnl_data = map_and_aggregate_pnl(pnl_data_raw, PNL_SYNONYMS)
+                # APLICAR EL FACTOR DE ESCALA A LOS DATOS RAW DE GEMINI Y LUEGO MAPEAREN PYTHON
+                # 1. Aplicar escala de unidad (miles/millones) a los datos RAW de Gemini
+                # Esta función apply_scale_factor_to_raw_data necesita 'unit'
+                # Dado que ya no pedimos 'Unidad' a Gemini, necesitamos inferirla aquí o asumirla.
+                # Para este ejemplo, si no se infiere explícitamente, asumimos 'unidades'
+                
+                # Aquí, la unit debe venir del JSON de Gemini (si lo extrae) o ser una suposición.
+                # Si el prompt de Celda 2 ya no pide "Unidad", la tenemos que inferir del documento
+                # o el usuario debería especificarla.
+                
+                # REVISAR: El prompt de Celda 2 SÍ pide "Unidad". ¡Recuperémosla!
+                inferred_unit_from_gemini_json = data_from_gemini.get("Unidad", "unidades")
 
-                # Convertir los datos agregados a USD
+                # Aplicar la escala a los datos brutos que vienen de Gemini
+                scaled_balance_raw = apply_scale_factor_to_raw_data(balance_data_raw, inferred_unit_from_gemini_json)
+                scaled_pnl_raw = apply_scale_factor_to_raw_data(pnl_data_raw, inferred_unit_from_gemini_json)
+
+                # 2. Mapear y agregar cuentas detalladas a las categorías estándar
+                # Estas funciones ahora trabajan con los datos ya escalados
+                aggregated_balance_data = map_and_aggregate_balance(scaled_balance_raw, BALANCE_SHEET_SYNONYMS)
+                aggregated_pnl_data = map_and_aggregate_pnl(scaled_pnl_raw, PNL_SYNONYMS)
+                
+                # 3. Convertir los datos agregados a USD
+                # convert_to_usd ya no necesita 'unit' porque la escala ya se aplicó
                 converted_balance_for_year = convert_to_usd(aggregated_balance_data, global_currency, year_int) 
                 converted_pnl_for_year = convert_to_usd(aggregated_pnl_data, global_currency, year_int)
                 
@@ -511,15 +534,17 @@ if uploaded_files_streamlit:
 
             st.subheader("Balance General (Valores en USD)")
             
-            # --- CONSTRUCCIÓN ROBUSTA DEL DATAFRAME DE BALANCE GENERAL ---
             all_balance_concepts_display_order = []
-            for category_name, items_list_in_structure in BALANCE_SHEET_STRUCTURE.items():
-                all_balance_concepts_display_order.append(category_name) # Título de Categoría
-                # Añadir los ítems estándar indentados
-                for item_name_standard, _ in items_list_in_structure:
-                    all_balance_concepts_display_order.append(f"    {item_name_standard}")
+            for category_name, items_list in BALANCE_SHEET_STRUCTURE.items():
+                all_balance_concepts_display_order.append(category_name) 
+                # Asegurarse de que solo accedemos al nombre estándar (primer elemento de la tupla)
+                if isinstance(items_list, list) and items_list and isinstance(items_list[0], tuple):
+                    all_balance_concepts_display_order.extend([f"    {item_pair[0]}" for item_pair in items_list]) 
+                # Para el caso donde items_list podría ser solo [TOTAL_STRING]
+                elif isinstance(items_list, list):
+                    all_balance_concepts_display_order.extend([f"    {item}" for item in items_list])
 
-            df_balance_combined = pd.DataFrame(index=all_balance_concepts_display_order) 
+            df_balance_combined = pd.DataFrame(index=all_balance_concepts_ordered) 
             
             for file_name_original_pdf, file_years_data in _final_data_for_display.items():
                 for year, converted_data_for_year in sorted(file_years_data.items()): 
@@ -555,8 +580,7 @@ if uploaded_files_streamlit:
 
             st.subheader("Estado de Pérdidas y Ganancias (Valores en USD)")
 
-            # --- CONSTRUCCIÓN ROBUSTA DEL DATAFRAME DE ESTADO DE PÉRDIDAS Y GANANCIAS ---
-            df_pnl_combined = pd.DataFrame(index=PNL_STANDARD_CONCEPTS) # Usamos PNL_STANDARD_CONCEPTS para el índice
+            df_pnl_combined = pd.DataFrame(index=PNL_STANDARD_CONCEPTS) 
 
             for file_name_original_pdf, file_years_data in _final_data_for_display.items():
                 for year, converted_data_for_year in sorted(file_years_data.items()): 
@@ -565,13 +589,13 @@ if uploaded_files_streamlit:
                     col_name = f"Valor - {file_name_original_pdf} ({year})" 
                     temp_column_data = pd.Series(index=PNL_STANDARD_CONCEPTS, dtype=object) 
                     
-                    for standard_item_name in PNL_STANDARD_CONCEPTS: # Iterar sobre el estándar PNL
+                    for standard_item_name in PNL_STANDARD_CONCEPTS: 
                         if standard_item_name in pnl_data_usd:
                             temp_column_data.loc[standard_item_name] = pnl_data_usd[standard_item_name]
                         else:
-                            temp_column_data.loc[standard_item_name] = "" # Dejar vacío si no hay valor
-
-                df_pnl_combined[col_name] = temp_column_data
+                            temp_column_data.loc[standard_item_name] = "" 
+                
+                    df_pnl_combined[col_name] = temp_column_data
                 
             for col in df_pnl_combined.columns:
                 df_pnl_combined[col] = df_pnl_combined[col].apply(
