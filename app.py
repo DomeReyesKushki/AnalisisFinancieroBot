@@ -303,6 +303,10 @@ def apply_scale_factor_to_raw_data(data_nested, unit):
         elif "miles" in unit_lower:
             scale_factor = 1_000.0
     
+    # Manejar si data_nested no es un diccionario (ej. si es null o un solo número)
+    if not isinstance(data_nested, dict):
+        return data_nested # Devolverlo tal cual si no es un diccionario
+
     for key, value in data_nested.items():
         if isinstance(value, dict):
             scaled_data[key] = apply_scale_factor_to_raw_data(value, unit) 
@@ -314,12 +318,19 @@ def apply_scale_factor_to_raw_data(data_nested, unit):
 
 # Función auxiliar para mapear y agregar cuentas de Balance General
 def map_and_aggregate_balance(raw_balance_data_nested, synonyms_map, unit):
-    # Inicializar el diccionario con las categorías estándar del Balance General a 0.0
-    aggregated_data = {concept: 0.0 for concept in BALANCE_SHEET_STANDARD_CONCEPTS_LIST} 
+    # raw_balance_data_nested es el diccionario que viene directamente del JSON de Gemini para BalanceGeneral
+    # Ejemplo: {'ACTIVOS': {'Activo Corriente': {'FONDO FIJO DE CAJA': 699.1, 'BANCOS': 287341.76, ...}}}
     
-    # Primero, aplicar el scale factor a todos los números ANTES de la agregación
-    # Esto asegura que todas las sumas se hagan con valores en unidades completas
+    # Inicializar el diccionario con las categorías estándar a 0.0
+    # Usamos BALANCE_SHEET_STANDARD_CONCEPTS_LIST que incluye los títulos y los ítems
+    aggregated_data = {concept: 0.0 for concept in BALANCE_SHEET_STANDARD_CONCEPTS_LIST if not concept.startswith("    ")} # Solo los nombres estándar, no los indentados
+
+    # Primero, aplicar el scale factor a todos los números dentro de la estructura de Gemini
+    # Asegúrate de que scaled_raw_data es un diccionario para poder iterar
     scaled_raw_data = apply_scale_factor_to_raw_data(raw_balance_data_nested, unit)
+    if not isinstance(scaled_raw_data, dict):
+        st.error(f"Error: Datos crudos escalados de Balance General no son un diccionario: {type(scaled_raw_data)}")
+        return {concept: "N/A" for concept in BALANCE_SHEET_STANDARD_CONCEPTS_LIST if not concept.startswith("    ")} # Devolver N/A si hay un error
 
     # Recorrer las secciones principales (ACTIVOS, PASIVOS, CAPITAL) del JSON de Gemini
     for section_name_outer, section_content_outer in scaled_raw_data.items():
@@ -334,16 +345,16 @@ def map_and_aggregate_balance(raw_balance_data_nested, synonyms_map, unit):
                             else:
                                 st.warning(f"Advertencia: Cuenta BG detallada '{account_name_raw}' no mapeada a estándar o fuera de estructura. Valor: {value_raw}")
                 # Manejar totales de sub-sección si están directamente bajo la sección principal (ej. "TOTAL ACTIVO CIRCULANTE")
-                elif isinstance(section_content_outer, (int, float)): # Si el contenido de la sección es un total directo
-                    mapped_name = synonyms_map.get(section_name_outer.lower())
-                    if mapped_name and mapped_name in aggregated_data: # Solo si mapea a una cuenta estándar existente
-                        aggregated_data[mapped_name] = section_content_outer # Sobrescribe si es un total
+                elif isinstance(sub_section_content, (int, float)): # Si el contenido de la sub-sección es un total directo
+                    mapped_name = synonyms_map.get(sub_section_name.lower())
+                    if mapped_name and mapped_name in aggregated_data: 
+                        aggregated_data[mapped_name] = sub_section_content 
                     else:
-                        st.warning(f"Advertencia: Total BG de sub-sección '{section_name_outer}' no mapeado. Valor: {section_content_outer}")
+                        st.warning(f"Advertencia: Total BG de sub-sección '{sub_section_name}' no mapeado. Valor: {sub_section_content}")
         elif isinstance(section_content_outer, (int, float)): # Para los TOTALES de nivel superior (ej. "TOTAL ACTIVOS" del JSON)
             mapped_name = synonyms_map.get(section_name_outer.lower())
             if mapped_name and mapped_name in aggregated_data:
-                aggregated_data[mapped_name] = section_content_outer # Estos son totales, no se suman a otros
+                aggregated_data[mapped_name] = section_content_outer 
             else:
                 st.warning(f"Advertencia: Total BG de nivel superior '{section_name_outer}' no mapeado. Valor: {section_content_outer}")
     
@@ -354,6 +365,10 @@ def map_and_aggregate_pnl(raw_pnl_data_nested, synonyms_map, unit):
     aggregated_data = {concept: 0.0 for concept in PNL_STANDARD_CONCEPTS} 
 
     scaled_raw_data = apply_scale_factor_to_raw_data(raw_pnl_data_nested, unit)
+
+    if not isinstance(scaled_raw_data, dict):
+        st.error(f"Error: Datos crudos escalados de PnL no son un diccionario: {type(scaled_raw_data)}")
+        return {concept: "N/A" for concept in PNL_STANDARD_CONCEPTS} 
 
     for section_name, section_content in scaled_raw_data.items():
         if isinstance(section_content, dict): 
@@ -373,6 +388,7 @@ def map_and_aggregate_pnl(raw_pnl_data_nested, synonyms_map, unit):
 
 
 def convert_to_usd(data_dict, currency_code, report_year): 
+    # Esta función ahora asume que data_dict ya tiene la escala de unidades aplicada (miles/millones)
     exchange_rate = get_exchange_rate(currency_code, date=report_year)
     
     st.write(f"DEBUG: Conversión - Moneda: {currency_code}, Año: {report_year}, Tasa USD: {exchange_rate}")
@@ -438,7 +454,7 @@ if uploaded_files_streamlit:
                 balance_data_raw = data_from_gemini.get("BalanceGeneral", {})
                 pnl_data_raw = data_from_gemini.get("EstadoResultados", {})
 
-                # Mapear y Agrupar cuentas (y aplicar escala aquí dentro)
+                # Aplicar Factor de Escala Y LUEGO Mapear y Agrupar cuentas
                 # Estas funciones ahora reciben la 'unit'
                 aggregated_balance_data = map_and_aggregate_balance(balance_data_raw, BALANCE_SHEET_SYNONYMS, global_unit)
                 aggregated_pnl_data = map_and_aggregate_pnl(pnl_data_raw, PNL_SYNONYMS, global_unit)
@@ -476,7 +492,7 @@ if uploaded_files_streamlit:
                     balance_data_usd = converted_data_for_year.get("BalanceGeneralUSD", {})
                     
                     col_name = f"Valor - {file_name_original_pdf} ({year})" 
-                    temp_column_data = pd.Series(index=all_balance_concepts_display_order, dtype=object)
+                    temp_column_data = pd.Series(index=all_balance_concepts_ordered, dtype=object)
 
                     for concept_to_display in all_balance_concepts_display_order:
                         standard_name_no_indent = concept_to_display.strip() 
@@ -484,10 +500,10 @@ if uploaded_files_streamlit:
                         if standard_name_no_indent in balance_data_usd and isinstance(balance_data_usd[standard_name_no_indent], (int, float)):
                             temp_column_data.loc[concept_to_display] = balance_data_usd[standard_name_no_indent]
                         elif standard_name_no_indent in [cat_item[0] for category_list in BALANCE_SHEET_STRUCTURE.values() for cat_item in category_list if isinstance(cat_item, tuple)]: # Es un ítem detallado que debería tener valor
-                            pass # map_and_aggregate_balance ya debe haber puesto el valor o 0.0
-                        elif standard_name_no_indent in [cat_name for cat_name in BALANCE_SHEET_STRUCTURE.keys() if cat_name == concept_to_display]: # Si es un título de categoría (ej. "Activos Corrientes")
-                             temp_column_data.loc[concept_to_display] = "" # Celda vacía para el título
-                        else: # Para otros casos (totales globales que no son encabezados de categoría, o no se encontró)
+                            pass 
+                        elif standard_name_no_indent in [cat_name for cat_name in BALANCE_SHEET_STRUCTURE.keys() if cat_name == concept_to_display]: # Es un título de categoría (ej. "Activos Corrientes")
+                             temp_column_data.loc[concept_to_display] = "" 
+                        else: 
                              pass 
                     
                 df_balance_combined[col_name] = temp_column_data 
