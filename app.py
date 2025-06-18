@@ -18,74 +18,120 @@ else:
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # --- Estructura del Balance General con SINÓNIMOS para mapeo ---
-BALANCE_SHEET_STRUCTURE = {
-    "Activos Corrientes": [
-        ("Inventarios", ["Inventarios", "Inventario Equipos"]),
-        ("Efectivo y equivalentes de efectivo", ["Efectivo y equivalentes de efectivo", "Efectivo y depósitos", "Bancos", "Caja", "Caja y Bancos"]), 
-        ("Cuentas por cobrar", ["Cuentas por cobrar", "Clientes", "Deudores", "Cuentas por cobrar comerciales", "Cuentas por cobrar a empresas relacionadas CP", "Deudores diversos"]), 
-        ("Gasto Anticipado", ["Gasto Anticipado", "Gastos pagados por anticipado", "Pagos anticipados"]), 
-        ("Otros activos", ["Otros activos", "Otros activos corrientes", "Activos por Impuestos", "Otros Activos", "Activos financieros"]),
-        ("Total Activo Corriente", ["Total Activo Corriente", "Total Activo a Corto Plazo", "Total Activo Corriente Netos"]) 
-    ],
-    "Activos No Corrientes": [
-        ("Propiedad, planta y equipo", ["Propiedad, planta y equipo", "Propiedad Planta y Equipo", "Activo Fijo", "Activo Fijo Neto"]), 
-        ("Intangibles (Software)", ["Intangibles (Software)", "Intangibles"]), 
-        ("Otros Activos No Corrientes", ["Otros Activos No Corrientes", "Activos diferidos", "Otros activos no corrientes", "Activos a largo plazo"]),
-        ("Total Activo No Corriente", ["Total Activo No Corriente", "Total Activo Fijo", "Total Activo a largo plazo"]) 
-    ],
-    "TOTAL ACTIVOS": [("TOTAL ACTIVOS", ["TOTAL ACTIVOS", "Total Activo", "SUMA DEL ACTIVO"])], 
-    "Pasivos a Corto Plazo": [
-        ("Préstamos y empréstitos corrientes", ["Préstamos y empréstitos corrientes", "Préstamos bancarios a corto plazo"]),
-        ("Obligaciones Financieras", ["Obligaciones Financieras", "Préstamos"]), 
-        ("Cuentas comerciales y otras cuentas por pagar", ["Cuentas comerciales y otras cuentas por pagar", "Acreedores diversos", "Proveedores"]), 
-        ("Cuentas por Pagar", ["Cuentas por Pagar", "Proveedores"]), 
-        ("Pasivo Laborales", ["Pasivo Laborales", "Provisiones para sueldos y salarios", "Remuneraciones por pagar", "Provisión de sueldos y salarios x pagar", "Provisión de contribuciones segsocial x pagar"]), 
-        ("Anticipos", ["Anticipos", "Anticipos de clientes"]), 
-        ("Impuestos Corrientes (Pasivo)", ["Impuestos Corrientes (Pasivo)", "Impuestos por pagar", "Pasivo por impuestos", "Impuestos trasladados cobrados", "Impuestos trasladados no cobrados", "Impuestos y derechos por pagar"]), 
-        ("Otros pasivos corrientes", ["Otros pasivos corrientes"]),
-        ("Total Pasivo Corriente", ["Total Pasivo Corriente", "Total Pasivo a Corto Plazo"]) 
-    ],
-    "Pasivos a Largo Plazo": [
-        ("Préstamos y empréstitos no corrientes", ["Préstamos y empréstitos no corrientes", "Préstamos bancarios a largo plazo"]),
-        ("Obligaciones Financieras No Corrientes", ["Obligaciones Financieras No Corrientes", "Obligaciones Financieras"]), 
-        ("Anticipos y Avances Recibidos", ["Anticipos y Avances Recibidos", "Depósitos en garantía"]), 
-        ("Otros pasivos no corrientes", ["Otros pasivos no corrientes", "Ingresos diferidos"]),
-        ("Total Pasivo No Corriente", ["Total Pasivo No Corriente", "Total Pasivo a largo plazo"]) 
-    ],
-    "TOTAL PASIVOS": [("TOTAL PASIVOS", ["TOTAL PASIVOS", "Total Pasivo", "SUMA DEL PASIVO"])], 
-    "Patrimonio Atribuible a los Propietarios de la Matriz": [
-        ("Capital social", ["Capital social", "Capital Emitido", "Capital Social"]), 
-        ("Aportes Para Futuras Capitalizaciones", ["Aportes Para Futuras Capitalizaciones"]), 
-        ("Resultados Ejerc. Anteriores", ["Resultados Ejerc. Anteriores", "Ganancias retenidas"]), 
-        ("Resultado del Ejercicio", ["Resultado del Ejercicio", "Utilidad del período", "Utilidad o Pérdida del Ejercicio"]), 
-        ("Otros componentes del patrimonio", ["Otros componentes del patrimonio", "Otras reservas", "Patrimonio Minoritario", "Impuestos retenidos"]), 
-        ("TOTAL PATRIMONIO", ["TOTAL PATRIMONIO", "Total Patrimonio", "SUMA DEL CAPITAL"]) 
-    ],
-    "TOTAL PASIVO Y PATRIMONIO": [("TOTAL PASIVO Y PATRIMONIO", ["TOTAL PASIVO Y PATRIMONIO", "Total Pasivo y Patrimonio", "SUMA DEL PASIVO Y CAPITAL"])] 
+# Cada item ahora es SOLO el nombre estándar. La lista de sinónimos se usa solo en el diccionario SYNONYMS.
+BALANCE_SHEET_STANDARD_CONCEPTS = [
+    "Activos Corrientes", # Título de Categoría
+    "Efectivo y equivalentes de efectivo", 
+    "Inventarios",
+    "Cuentas por cobrar", 
+    "Cuentas por cobrar a empresas relacionadas CP", 
+    "Gasto Anticipado", 
+    "Otros activos",
+    "Total Activo Corriente", 
+
+    "Activos No Corrientes", # Título de Categoría
+    "Propiedad, planta y equipo", 
+    "Activo Fijo", 
+    "Intangibles (Software)", 
+    "Otros Activos No Corrientes",
+    "Total Activo No Corriente", 
+
+    "TOTAL ACTIVOS", 
+
+    "Pasivos a Corto Plazo", # Título de Categoría
+    "Préstamos y empréstitos corrientes",
+    "Obligaciones Financieras", 
+    "Cuentas comerciales y otras cuentas por pagar", 
+    "Cuentas por Pagar", 
+    "Pasivo Laborales", 
+    "Anticipos", 
+    "Impuestos Corrientes (Pasivo)", 
+    "Impuestos por pagar", 
+    "Otros pasivos corrientes",
+    "Total Pasivo Corriente", 
+
+    "Pasivos a Largo Plazo", # Título de Categoría
+    "Préstamos y empréstitos no corrientes",
+    "Obligaciones Financieras No Corrientes", 
+    "Anticipos y Avances Recibidos", 
+    "Otros pasivos no corrientes",
+    "Total Pasivo No Corriente", 
+
+    "TOTAL PASIVOS", 
+
+    "Patrimonio Atribuible a los Propietarios de la Matriz", # Título de Categoría
+    "Capital social", 
+    "Capital Emitido",
+    "Aportes Para Futuras Capitalizaciones", 
+    "Resultados Ejerc. Anteriores", 
+    "Resultado del Ejercicio", 
+    "Otros componentes del patrimonio",
+    "TOTAL PATRIMONIO", 
+
+    "TOTAL PASIVO Y PATRIMONIO"
+]
+
+# Mapeo de sinónimos (llave es sinónimo.lower(), valor es el nombre estándar)
+# Este diccionario se usará en Python para mapear lo que Gemini extrae a tus categorías estándar
+BALANCE_SHEET_SYNONYMS = {
+    "inventarios": "Inventarios", "inventario equipos": "Inventarios",
+    "efectivo y equivalentes de efectivo": "Efectivo y equivalentes de efectivo", "efectivo y depósitos": "Efectivo y equivalentes de efectivo", "bancos": "Efectivo y equivalentes de efectivo", "caja": "Efectivo y equivalentes de efectivo", "fondo fijo de caja": "Efectivo y equivalentes de efectivo", "caja y bancos": "Efectivo y equivalentes de efectivo",
+    "cuentas por cobrar": "Cuentas por cobrar", "clientes": "Cuentas por cobrar", "deudores": "Cuentas por cobrar", "cuentas por cobrar comerciales": "Cuentas por cobrar", "cuentas por cobrar a empresas relacionadas cp": "Cuentas por cobrar a empresas relacionadas CP", "deudores diversos": "Cuentas por cobrar",
+    "gasto anticipado": "Gasto Anticipado", "gastos pagados por anticipado": "Gasto Anticipado", "pagos anticipados": "Gasto Anticipado", "impuestos a favor": "Gasto Anticipado", "pagos provisionales": "Gasto Anticipado",
+    "otros activos": "Otros activos", "otros activos corrientes": "Otros activos", "activos por impuestos": "Otros activos", "activos financieros": "Otros activos", "otros activos":"Otros activos", # Para Activos Corrientes
+
+    "propiedad, planta y equipo": "Propiedad, planta y equipo", "propiedad planta y equipo": "Propiedad, planta y equipo", "activo fijo": "Propiedad, planta y equipo", "activo fijo neto": "Propiedad, planta y equipo",
+    "intangibles (software)": "Intangibles (Software)", "intangibles": "Intangibles (Software)",
+    "otros activos no corrientes": "Otros Activos No Corrientes", "activos diferidos": "Otros Activos No Corrientes", "activos a largo plazo": "Otros Activos No Corrientes",
+
+    "total activo circulante": "Total Activo Corriente",
+    "total activo no corriente": "Total Activo No Corriente", "total activo fijo": "Total Activo No Corriente", "total activo a largo plazo": "Total Activo No Corriente",
+    "total activos": "TOTAL ACTIVOS", "total activo": "TOTAL ACTIVOS", "suma del activo": "TOTAL ACTIVOS",
+
+    "préstamos y empréstitos corrientes": "Préstamos y empréstitos corrientes", "préstamos bancarios a corto plazo": "Préstamos y empréstitos corrientes",
+    "obligaciones financieras": "Obligaciones Financieras", "préstamos": "Obligaciones Financieras",
+    "cuentas comerciales y otras cuentas por pagar": "Cuentas comerciales y otras cuentas por pagar", "acreedores diversos": "Cuentas comerciales y otras cuentas por pagar", "proveedores": "Cuentas comerciales y otras cuentas por pagar",
+    "cuentas por pagar": "Cuentas por Pagar", 
+    "pasivo laborales": "Pasivo Laborales", "provisiones para sueldos y salarios": "Pasivo Laborales", "remuneraciones por pagar": "Pasivo Laborales", "provisión de sueldos y salarios x pagar": "Pasivo Laborales", "provisión de contribuciones segsocial x pagar": "Pasivo Laborales",
+    "anticipos": "Anticipos", "anticipos de clientes": "Anticipos",
+    "impuestos corrientes (pasivo)": "Impuestos Corrientes (Pasivo)", "impuestos por pagar": "Impuestos Corrientes (Pasivo)", "pasivo por impuestos": "Impuestos Corrientes (Pasivo)", "impuestos trasladados cobrados": "Impuestos Corrientes (Pasivo)", "impuestos trasladados no cobrados": "Impuestos Corrientes (Pasivo)", "impuestos y derechos por pagar": "Impuestos Corrientes (Pasivo)",
+    "otros pasivos corrientes": "Otros pasivos corrientes",
+    "total pasivo corriente": "Total Pasivo Corriente", "total pasivo a corto plazo": "Total Pasivo Corriente",
+
+    "préstamos y empréstitos no corrientes": "Préstamos y empréstitos no corrientes", "préstamos bancarios a largo plazo": "Préstamos y empréstitos no corrientes",
+    "obligaciones financieras no corrientes": "Obligaciones Financieras No Corrientes", 
+    "anticipos y avances recibidos": "Anticipos y Avances Recibidos", "depósitos en garantía": "Anticipos y Avances Recibidos",
+    "otros pasivos no corrientes": "Otros pasivos no corrientes", "ingresos diferidos": "Otros pasivos no corrientes",
+    "total pasivo no corriente": "Total Pasivo No Corriente", "total pasivo a largo plazo": "Total Pasivo No Corriente",
+
+    "total pasivos": "TOTAL PASIVOS", "total pasivo": "TOTAL PASIVOS", "suma del pasivo": "TOTAL PASIVOS",
+
+    "capital social": "Capital social", "capital emitido": "Capital social",
+    "aportes para futuras capitalizaciones": "Aportes Para Futuras Capitalizaciones",
+    "resultados ejerc. anteriores": "Resultados Ejerc. Anteriores", "ganancias retenidas": "Resultados Ejerc. Anteriores",
+    "resultado del ejercicio": "Resultado del Ejercicio", "utilidad del período": "Resultado del Ejercicio", "utilidad o pérdida del ejercicio": "Resultado del Ejercicio",
+    "otros componentes del patrimonio": "Otros componentes del patrimonio", "otras reservas": "Otros componentes del patrimonio", "patrimonio minoritario": "Otros componentes del patrimonio", "impuestos retenidos": "Otros componentes del patrimonio", # Si Impuestos retenidos es patrimonio negativo
+    "total patrimonio": "TOTAL PATRIMONIO", "suma del capital": "TOTAL PATRIMONIO",
+
+    "total pasivo y patrimonio": "TOTAL PASIVO Y PATRIMONIO", "suma del pasivo y capital": "TOTAL PASIVO Y PATRIMONIO"
 }
 
-# Diccionario de sinónimos para facilitar el mapeo en el código (llave es sinónimo.lower(), valor es nombre estándar)
-BALANCE_SHEET_SYNONYMS = {}
-for main_category, items_list in BALANCE_SHEET_STRUCTURE.items():
-    for standard_name, synonyms in items_list: 
-        for syn in synonyms:
-            BALANCE_SHEET_SYNONYMS[syn.lower()] = standard_name
+PNL_STANDARD_ITEMS = [
+    "Ingresos por Ventas", "Costo de Ventas", "Ganancia Bruta", 
+    "Gastos de Operación", "Ganancia (Pérdida) de Operación", 
+    "Ingresos (Gastos) Financieros", "Impuesto a la Renta", "Ganancia (Pérdida) Neta"
+]
 
-PNL_STANDARD_ITEMS_MAP = {
-    "Ingresos por Ventas": ["Ingresos por Ventas", "Ventas Netas", "Ingresos Operacionales", "Ingresos"],
-    "Costo de Ventas": ["Costo de Ventas", "Costo de Bienes Vendidos", "Costos"],
-    "Ganancia Bruta": ["Ganancia Bruta", "Margen Bruto"], 
-    "Gastos de Operación": ["Gastos de Operación", "Gastos de Administración", "Gastos de Venta", "Gastos Operacionales", "Gastos generales"],
-    "Ganancia (Pérdida) de Operación": ["Ganancia (Pérdida) de Operación", "Utilidad Operacional", "EBITDA", "Utilidad (o Pérdida)"],
-    "Ingresos (Gastos) Financieros": ["Ingresos (Gastos) Financieros", "Gastos Financieros", "Ingresos Financieros", "Resultado Integral de Financiamiento"],
-    "Impuesto a la Renta": ["Impuesto a la Renta", "Gasto por Impuestos", "Impuesto sobre la Renta"],
-    "Ganancia (Pérdida) Neta": ["Ganancia (Pérdida) Neta", "Utilidad Neta", "Resultado del Período", "Resultado del Ejercicio"]
+PNL_SYNONYMS = {
+    "ingresos por ventas": "Ingresos por Ventas", "ventas netas": "Ingresos por Ventas", "ingresos operacionales": "Ingresos por Ventas", "ingresos": "Ingresos por Ventas",
+    "costo de ventas": "Costo de Ventas", "costo de bienes vendidos": "Costo de Ventas", "costos": "Costo de Ventas",
+    "ganancia bruta": "Ganancia Bruta", "margen bruto": "Ganancia Bruta", 
+    "gastos de operación": "Gastos de Operación", "gastos de administración": "Gastos de Operación", "gastos de venta": "Gastos de Operación", "gastos operacionales": "Gastos de Operación", "gastos generales": "Gastos de Operación",
+    "ganancia (pérdida) de operación": "Ganancia (Pérdida) de Operación", "utilidad operacional": "Ganancia (Pérdida) de Operación", "ebitda": "Ganancia (Pérdida) de Operación", "utilidad (o pérdida)": "Ganancia (Pérdida) de Operación",
+    "ingresos (gastos) financieros": "Ingresos (Gastos) Financieros", "gastos financieros": "Ingresos (Gastos) Financieros", "ingresos financieros": "Ingresos (Gastos) Financieros", "resultado integral de financiamiento": "Ingresos (Gastos) Financieros",
+    "impuesto a la renta": "Impuesto a la Renta", "gasto por impuestos": "Impuesto a la Renta", "impuesto sobre la renta": "Impuesto a la Renta",
+    "ganancia (pérdida) neta": "Ganancia (Pérdida) Neta", "utilidad neta": "Ganancia (Pérdida) Neta", "resultado del período": "Ganancia (Pérdida) Neta", "resultado del ejercicio": "Ganancia (Pérdida) Neta"
 }
-
-PNL_SYNONYMS = {}
-for standard_name, synonyms in PNL_STANDARD_ITEMS_MAP.items():
-    for syn in synonyms:
-        PNL_SYNONYMS[syn.lower()] = standard_name
 
 
 # --- Tasas de cambio de ejemplo por AÑO (AL 31 DE DICIEMBRE DE CADA AÑO) ---
@@ -151,8 +197,7 @@ def extract_financial_data(uploaded_file_content_object, api_key):
         
         pdf_part = genai.upload_file(path=temp_file_path, display_name=file_name)
 
-        # PROMPT MEJORADO: Ahora Gemini NO devolverá "Unidad". Asumiremos valor directo.
-        # Y la inferencia de moneda es más robusta.
+        # PROMPT MEJORADO PARA EXTRACCIÓN DE CUENTAS DETALLADAS Y SIN INFERENCIA DE UNIDAD
         prompt = f"""
         Analiza cuidadosamente el siguiente documento PDF que contiene estados financieros.
 
@@ -162,65 +207,10 @@ def extract_financial_data(uploaded_file_content_object, api_key):
         -   **Moneda Global:** Identifica la moneda principal. Busca símbolos de moneda ($, €, S/, Bs), códigos ISO (USD, EUR, MXN, COP, CLP, PEN), o palabras como "Pesos Mexicanos", "Pesos Colombianos", "Soles Peruanos", "Dólares", "Euros". Si el documento menciona el país de la empresa (ej. "Mexico", "Colombia", "Chile", "Perú"), infiere la moneda local si no está explícitamente definida (ej. "Mexico" -> MXN, "Colombia" -> COP, "Chile" -> CLP, "Perú" -> PEN). Extrae el código ISO o abreviatura más común (COP, CLP, MXN, USD, EUR, PEN). Si no se puede inferir con certeza, usa "USD" como valor por defecto.
         -   **Años de Reporte:** Identifica TODOS los años de las columnas de DICIEMBRE disponibles (ej. 2024, 2023). Si no hay DICIEMBRE, identifica los años de las últimas 2 columnas de fecha disponibles.
 
-        **Paso 2: Extracción de Valores y Encasillamiento Flexible para Balance General (por Año).**
-        Para cada año/columna de fecha identificada, extrae los valores NUMÉRICOS.
-        **MUY IMPORTANTE:** Los valores numéricos deben ser el **VALOR COMPLETO EN UNIDADES BASE de la moneda, TAL CUAL APARECE EN EL DOCUMENTO, sin aplicar ninguna multiplicación por "millones" o "miles" aquí.** Si el documento dice "1.485.361" y es "CLP$m", devuelve 1485361. Si dice "77.448,01", devuelve 77448.01. La conversión a la unidad final (millones o miles) y a USD se hará en Python.
-        Sé flexible con los nombres de las cuentas que encuentres en el documento y encasíllalas en las categorías ESTÁNDAR proporcionadas. Si una cuenta no encaja, omítela o déjala como "N/A".
-
-        **Categorías ESTÁNDAR de Balance General y COINCIDENCIAS ESTRICTAS:**
-        -   **Activos Corrientes:**
-            -   "Efectivo y equivalentes de efectivo": valor
-            -   "Cuentas por cobrar": valor
-            -   "Cuentas por cobrar a empresas relacionadas CP": valor
-            -   "Inventario Equipos": valor
-            -   "Gasto Anticipado": valor
-            -   "Otros activos": valor
-            "Total Activo Corriente": valor
-        -   **Activos No Corrientes:**
-            -   "Propiedad, planta y equipo": valor
-            -   "Activo Fijo": valor
-            -   "Intangibles (Software)": valor
-            -   "Otros Activos No Corrientes": valor
-            "Total Activo No Corriente": valor
-        -   **TOTAL ACTIVOS**: valor
-        -   **Pasivos a Corto Plazo:**
-            -   "Préstamos y empréstitos corrientes": valor
-            -   "Obligaciones Financieras": valor
-            -   "Cuentas comerciales y otras cuentas por pagar": valor
-            -   "Cuentas por Pagar": valor
-            -   "Pasivo Laborales": valor
-            -   "Anticipos": valor
-            -   "Impuestos Corrientes (Pasivo)": valor
-            -   "Impuestos por pagar": valor
-            "Otros pasivos corrientes": valor
-            "Total Pasivo Corriente": valor
-        -   **Pasivos a Largo Plazo:** (Si no están explícitamente listados, omite esta sección.)
-            -   "Préstamos y empréstitos no corrientes": valor
-            -   "Obligaciones Financieras": valor
-            -   "Anticipos y Avances Recibidos": valor
-            -   "Otros pasivos no corrientes": valor
-            "Total Pasivo No Corriente": valor
-        -   **TOTAL PASIVOS**: valor
-        -   **Patrimonio Atribuible a los Propietarios de la Matriz:**
-            -   "Capital social": valor
-            -   "Capital Emitido": valor
-            -   "Aportes Para Futuras Capitalizaciones": valor
-            -   "Resultados Ejerc. Anteriores": valor
-            -   "Resultado del Ejercicio": valor
-            -   "Otros componentes del patrimonio": valor
-            "TOTAL PATRIMONIO": valor
-        -   **TOTAL PASIVO Y PATRIMONIO**: valor
-
-        **Paso 3: Extracción de Estado de Pérdidas y Ganancias (por Año, si presente).**
-        Si el documento contiene un Estado de Pérdidas y Ganancias, extrae los valores para las mismas columnas de años identificadas en el Paso 1 para las siguientes categorías ESTÁNDAR:
-        -   "Ingresos por Ventas"
-        -   "Costo de Ventas"
-        -   "Ganancia Bruta"
-        -   "Gastos de Operación"
-        -   "Ganancia (Pérdida) de Operación"
-        -   "Ingresos (Gastos) Financieros"
-        -   "Impuesto a la Renta"
-        -   "Ganancia (Pérdida) Neta"
+        **Paso 2: Extracción de Todas las Cuentas Detalladas (Balance General por Año).**
+        Para cada año/columna de fecha identificada, extrae TODAS las cuentas de detalle que veas bajo las secciones principales (ej. "ACTIVOS", "Activo Corriente", "PASIVOS", "Patrimonio") y sus valores numéricos correspondientes.
+        **MUY IMPORTANTE:** Los valores numéricos deben ser el número **TAL CUAL APARECE EN EL DOCUMENTO**, sin aplicar ninguna multiplicación por "millones" o "miles". Si el documento dice "1.485.361" y es "CLP$m", devuelve 1485361. Si dice "77.448,01", devuelve 77448.01. La conversión de la magnitud a unidades completas y a USD se hará COMPLETAMENTE en Python.
+        Devuelve el **NOMBRE DE LA CUENTA EXACTAMENTE como aparece en el documento**, y su valor. No intentes encasillar o resumir en este paso.
 
         **Formato de Salida Requerido:**
         Proporciona la salida en formato JSON con la siguiente estructura. Las claves de los años (ej. "2024") deben ser strings.
@@ -231,27 +221,67 @@ def extract_financial_data(uploaded_file_content_object, api_key):
             {{
               "Anio": "2024",
               "BalanceGeneral": {{ 
-                "Activos Corrientes": {{ "Efectivo y equivalentes de efectivo": valor, ... }},
-                "TOTAL ACTIVOS": valor,
-                ...
+                "ACTIVOS": {{
+                    "Activo Corriente": {{
+                        "Nombre de cuenta detalle 1": valor,
+                        "Nombre de cuenta detalle 2": valor,
+                        "TOTAL ACTIVO CIRCULANTE": valor,
+                        ...
+                    }},
+                    "Activo No Corriente": {{
+                        "Nombre de cuenta detalle X": valor,
+                        "TOTAL ACTIVO NO CORRIENTE": valor,
+                        ...
+                    }},
+                    "TOTAL ACTIVO": valor
+                }},
+                "PASIVOS": {{
+                    "Pasivo Corriente": {{
+                        "Nombre de cuenta detalle P1": valor,
+                        "TOTAL PASIVO A CORTO PLAZO": valor,
+                        ...
+                    }},
+                    "Pasivo a Largo Plazo": {{
+                        "Nombre de cuenta detalle P2": valor,
+                        "TOTAL PASIVO A LARGO PLAZO": valor,
+                        ...
+                    }},
+                    "TOTAL PASIVO": valor
+                }},
+                "CAPITAL": {{
+                    "Nombre de cuenta detalle C1": valor,
+                    "TOTAL CAPITAL": valor,
+                    ...
+                }},
+                "TOTAL PASIVO Y CAPITAL": valor
               }},
               "EstadoResultados": {{ 
-                "Ingresos por Ventas": valor,
-                ...
-              }}
-            }},
-            {{
-              "Anio": "2023",
-              "BalanceGeneral": {{ 
-                "Activos Corrientes": {{ "Efectivo y equivalentes de efectivo": valor, ... }},
-                "TOTAL ACTIVOS": valor,
-                ...
-              }},
-              "EstadoResultados": {{ 
-                "Ingresos por Ventas": valor,
-                ...
+                "Ingresos": {{
+                    "Nombre de cuenta detalle I1": valor,
+                    "TOTAL INGRESOS": valor,
+                    ...
+                }},
+                "Costos": {{
+                    "Nombre de cuenta detalle C1": valor,
+                    "TOTAL COSTOS": valor,
+                    ...
+                }},
+                "TOTAL UTILIDAD BRUTA": valor,
+                "Gastos de Operación": {{
+                    "Nombre de cuenta detalle G1": valor,
+                    "TOTAL GASTO DE OPERACIÓN": valor,
+                    ...
+                }},
+                "UTILIDAD DE OPERACIÓN": valor,
+                "Gastos y Productos Financieros": {{
+                    "Nombre de cuenta detalle F1": valor,
+                    "TOTAL GTOS Y PROD FINANC": valor,
+                    ...
+                }},
+                "RESULTADO DEL EJERCICIO": valor
               }}
             }}
+            # ... Puede haber otro objeto similar para Anio 2023 ...
           ]
         }}
 
@@ -272,7 +302,6 @@ def extract_financial_data(uploaded_file_content_object, api_key):
             data_from_gemini = json.loads(json_string) 
             
             global_currency = data_from_gemini.get("Moneda")
-            # Ya no pedimos "Unidad" a Gemini
             
             for report_entry in data_from_gemini.get("ReportesPorAnio", []):
                 year_str = report_entry.get("Anio") 
@@ -280,7 +309,7 @@ def extract_financial_data(uploaded_file_content_object, api_key):
                     extracted_data_key = f"{file_name}_{year_str}" 
                     extracted_data_for_file[extracted_data_key] = { 
                         "Moneda": global_currency,
-                        "AnioInforme": year_str, # Eliminamos "Unidad" de aquí
+                        "AnioInforme": year_str, 
                         "BalanceGeneral": report_entry.get("BalanceGeneral", {}),
                         "EstadoResultados": report_entry.get("EstadoResultados", {})
                     }
@@ -302,21 +331,103 @@ def extract_financial_data(uploaded_file_content_object, api_key):
     return extracted_data_for_file 
 
 
-def convert_to_usd(data_dict, currency_code, report_year): # Quitamos 'unit' de los parámetros
-    # scale_factor se define aquí basado en el contexto si es necesario, no de Gemini
-    # Pero si queremos valor tal cual, scale_factor es 1.0 siempre.
-    scale_factor = 1.0 # Asumimos que Gemini ya dio el valor tal cual
+# Función auxiliar para mapear y agregar cuentas de Balance General
+def map_and_aggregate_balance(raw_balance_data, synonyms_map):
+    aggregated_data = {key: 0.0 for key in BALANCE_SHEET_STANDARD_CONCEPTS if not key.startswith("Total")} # Inicializa solo los no-totales directos
+    
+    # Manejar las secciones principales como Activos, Pasivos, Capital
+    for section_name, section_content in raw_balance_data.items():
+        if isinstance(section_content, dict): # Si es una sección con sub-secciones (ej. "ACTIVOS")
+            for sub_section_name, sub_section_content in section_content.items():
+                if isinstance(sub_section_content, dict): # Si es una sub-sección con cuentas detalladas (ej. "Activo Corriente")
+                    for account_name_raw, value_raw in sub_section_content.items():
+                        if value_raw is not None and isinstance(value_raw, (int, float)):
+                            mapped_name = synonyms_map.get(account_name_raw.lower())
+                            if mapped_name:
+                                aggregated_data[mapped_name] += value_raw
+                            else:
+                                st.warning(f"Advertencia: Cuenta '{account_name_raw}' no mapeada a ninguna categoría estándar. Valor: {value_raw}")
+                elif isinstance(section_content, (int, float)): # Si es un total directo de una sección (ej. "TOTAL ACTIVO")
+                    mapped_name = synonyms_map.get(section_name.lower())
+                    if mapped_name:
+                        aggregated_data[mapped_name] += section_content # Suma el total si se mapea
+                    else:
+                        st.warning(f"Advertencia: Total de sección '{section_name}' no mapeado. Valor: {section_content}")
+        elif isinstance(section_content, (int, float)): # Para los totales de nivel superior (ej. "TOTAL ACTIVOS" del JSON)
+            mapped_name = synonyms_map.get(section_name.lower())
+            if mapped_name:
+                aggregated_data[mapped_name] = section_content # Sobrescribe si ya hay un total
+            else:
+                st.warning(f"Advertencia: Total global '{section_name}' no mapeado. Valor: {section_content}")
+    
+    # Rellenar los totales directamente desde Gemini si existen, después de la agregación de subcuentas
+    for standard_total_concept in ["Total Activo Corriente", "Total Activo No Corriente", "TOTAL ACTIVOS",
+                                  "Total Pasivo Corriente", "Total Pasivo No Corriente", "TOTAL PASIVOS",
+                                  "TOTAL PATRIMONIO", "TOTAL PASIVO Y PATRIMONIO"]:
+        # Buscar este total en los datos extraídos brutos (no agregados)
+        found_total = None
+        # Buscar en secciones principales si el total está directo ahí
+        for section_name, section_content in raw_balance_data.items():
+            if isinstance(section_content, (int, float)): # Si es un total directo de alto nivel
+                mapped_name = synonyms_map.get(section_name.lower())
+                if mapped_name == standard_total_concept:
+                    found_total = section_content
+                    break
+            elif isinstance(section_content, dict): # Si es una sección con sub-secciones
+                for sub_section_name, sub_section_content in section_content.items():
+                    if isinstance(sub_section_content, (int, float)): # Si es un sub-total directo (ej. 'TOTAL ACTIVO CIRCULANTE')
+                        mapped_name = synonyms_map.get(sub_section_name.lower())
+                        if mapped_name == standard_total_concept:
+                            found_total = sub_section_content
+                            break
+                    elif isinstance(sub_section_content, dict): # Si es una sección con detalles
+                        for detail_name, detail_value in sub_section_content.items():
+                            if detail_value is not None and isinstance(detail_value, (int, float)):
+                                mapped_name = synonyms_map.get(detail_name.lower())
+                                if mapped_name == standard_total_concept:
+                                    found_total = detail_value
+                                    break
+                    if found_total is not None: break
+            if found_total is not None: break
 
+        if found_total is not None:
+            aggregated_data[standard_total_concept] = found_total
+    
+    return aggregated_data
+
+# Función auxiliar para mapear y agregar cuentas de Estado de Pérdidas y Ganancias
+def map_and_aggregate_pnl(raw_pnl_data, synonyms_map):
+    aggregated_data = {key: 0.0 for key in PNL_STANDARD_ITEMS} 
+
+    for section_name, section_content in raw_pnl_data.items():
+        if isinstance(section_content, dict): 
+            for account_name_raw, value_raw in section_content.items():
+                if value_raw is not None and isinstance(value_raw, (int, float)):
+                    mapped_name = synonyms_map.get(account_name_raw.lower())
+                    if mapped_name:
+                        aggregated_data[mapped_name] += value_raw
+                    else:
+                        st.warning(f"Advertencia: Cuenta PnL '{account_name_raw}' no mapeada a ninguna categoría estándar. Valor: {value_raw}")
+        elif isinstance(section_content, (int, float)): # Para los totales directos de PnL (ej. Ganancia Bruta)
+            mapped_name = synonyms_map.get(section_name.lower())
+            if mapped_name:
+                aggregated_data[mapped_name] = section_content 
+            else:
+                st.warning(f"Advertencia: Total PnL '{section_name}' no mapeado. Valor: {section_content}")
+
+    return aggregated_data
+
+def convert_to_usd(data_dict, currency_code, report_year): 
     exchange_rate = get_exchange_rate(currency_code, date=report_year)
     
-    st.write(f"DEBUG: Conversión - Moneda: {currency_code}, Año: {report_year}, Factor Escala: {scale_factor}, Tasa USD: {exchange_rate}")
+    st.write(f"DEBUG: Conversión - Moneda: {currency_code}, Año: {report_year}, Tasa USD: {exchange_rate}")
 
     converted_data = {} 
     for key, value in data_dict.items():
         if isinstance(value, dict):
-            converted_data[key] = convert_to_usd(value, currency_code, report_year) # Ya no pasamos 'unit'
+            converted_data[key] = convert_to_usd(value, currency_code, report_year) 
         elif isinstance(value, (int, float)):
-            converted_value = value * scale_factor * exchange_rate # Multiplicar solo por escala_factor (que es 1.0) y tasa
+            converted_value = value * exchange_rate
             converted_data[key] = converted_value
         else:
             converted_data[key] = value 
@@ -353,7 +464,7 @@ if uploaded_files_streamlit:
                 year_str_from_key = parts[1] if len(parts) > 1 else None
                 
                 global_currency = data_from_gemini.get("Moneda", "N/A").upper()
-                # global_unit = data_from_gemini.get("Unidad", "unidades") # Ya no extraemos Unidad de Gemini
+                global_unit = data_from_gemini.get("Unidad", "unidades") # La Unidad viene de Gemini, pero la usamos para escalar aquí.
                 year_int = None
                 
                 try:
@@ -367,14 +478,27 @@ if uploaded_files_streamlit:
                     st.warning(f"Advertencia: Moneda o Año no identificados para {extracted_key}. Saltando conversión.")
                     continue
                 
-                st.write(f"Identificada moneda: {global_currency}, Año: {year_int} para {file_name_original_pdf} (Reporte {year_int}).")
+                st.write(f"Identificada moneda: {global_currency}, Año: {year_int}, Unidad: {global_unit} para {file_name_original_pdf} (Reporte {year_int}).")
                 
+                # Obtener los datos crudos de BalanceGeneral y EstadoResultados de Gemini
                 balance_data_raw = data_from_gemini.get("BalanceGeneral", {})
                 pnl_data_raw = data_from_gemini.get("EstadoResultados", {})
 
-                # La función convert_to_usd ya no recibe 'unit'
-                converted_balance_for_year = convert_to_usd(balance_data_raw, global_currency, year_int) 
-                converted_pnl_for_year = convert_to_usd(pnl_data_raw, global_currency, year_int)
+                # APLICAR EL FACTOR DE ESCALA A LOS DATOS RAW DE GEMINI Y LUEGO MAPEAREN PYTHON
+                # Nota: scale_factor ahora se aplica aquí, no en convert_to_usd
+                # Ya que convert_to_usd no recibe 'unit', lo manejamos aquí antes de la conversión final.
+
+                # 1. Aplicar escala de unidad (miles/millones) a los datos RAW de Gemini
+                scaled_balance_raw = apply_scale_factor_to_raw_data(balance_data_raw, global_unit)
+                scaled_pnl_raw = apply_scale_factor_to_raw_data(pnl_data_raw, global_unit)
+
+                # 2. Mapear y agregar cuentas detalladas a las categorías estándar
+                aggregated_balance_data = map_and_aggregate_balance(scaled_balance_raw, BALANCE_SHEET_SYNONYMS)
+                aggregated_pnl_data = map_and_aggregate_pnl(scaled_pnl_raw, PNL_SYNONYMS)
+                
+                # 3. Convertir los datos agregados a USD
+                converted_balance_for_year = convert_to_usd(aggregated_balance_data, global_currency, year_int) 
+                converted_pnl_for_year = convert_to_usd(aggregated_pnl_data, global_currency, year_int)
                 
                 if file_name_original_pdf not in _final_data_for_display:
                     _final_data_for_display[file_name_original_pdf] = {}
@@ -393,9 +517,10 @@ if uploaded_files_streamlit:
             all_balance_concepts_ordered = []
             for category_name, items_list in BALANCE_SHEET_STRUCTURE.items():
                 all_balance_concepts_ordered.append(category_name) 
+                # Asegurarse de que solo accedemos al nombre estándar (primer elemento de la tupla)
                 if isinstance(items_list, list) and items_list and isinstance(items_list[0], tuple):
                     all_balance_concepts_ordered.extend([f"    {item_pair[0]}" for item_pair in items_list]) 
-                elif isinstance(items_list, list):
+                else: # Para los totales que son solo un string en la lista, no una tupla (ej. ["TOTAL ACTIVOS"])
                     all_balance_concepts_ordered.extend([f"    {item}" for item in items_list])
 
             df_balance_combined = pd.DataFrame(index=all_balance_concepts_ordered) 
@@ -407,27 +532,15 @@ if uploaded_files_streamlit:
                     col_name = f"Valor - {file_name_original_pdf} ({year})" 
                     temp_column_data = pd.Series(index=all_balance_concepts_ordered, dtype=object)
 
-                    for category_name_outer, items_list_outer in BALANCE_SHEET_STRUCTURE.items():
-                        if category_name_outer in balance_data_usd:
-                            temp_column_data.loc[category_name_outer] = "" 
-                            if isinstance(balance_data_usd.get(category_name_outer), dict): 
-                                for standard_item_name_tuple, _ in BALANCE_SHEET_STRUCTURE[category_name_outer]: 
-                                    standard_item_name = standard_item_name_tuple 
-                                    
-                                    found_value = None
-                                    for extracted_account_name_gemini, extracted_value_gemini in balance_data_usd[category_name_outer].items():
-                                        mapped_standard_name = BALANCE_SHEET_SYNONYMS.get(extracted_account_name_gemini.lower())
-                                        
-                                        if mapped_standard_name == standard_item_name:
-                                            found_value = extracted_value_gemini
-                                            break 
-                                    
-                                    if found_value is not None:
-                                        temp_column_data.loc[f"    {standard_item_name}"] = found_value
-                                
-
-                        elif isinstance(balance_data_usd.get(category_name_outer), (int, float)):
-                            temp_column_data.loc[category_name_outer] = balance_data_usd[category_name_outer]
+                    for concept_to_display in all_balance_concepts_ordered:
+                        # Si es un título de categoría (sin indentación)
+                        if not concept_to_display.strip().startswith("Total") and concept_to_display in BALANCE_SHEET_STRUCTURE:
+                            temp_column_data.loc[concept_to_display] = ""
+                        else: # Es un ítem detallado o un total
+                            # Obtener el nombre estándar sin indentación
+                            standard_item_name = concept_to_display.strip() 
+                            if standard_item_name in balance_data_usd:
+                                temp_column_data.loc[concept_to_display] = balance_data_usd[standard_item_name]
                     
                 df_balance_combined[col_name] = temp_column_data 
                 
@@ -440,25 +553,18 @@ if uploaded_files_streamlit:
 
             st.subheader("Estado de Pérdidas y Ganancias (Valores en USD)")
 
-            df_pnl_combined = pd.DataFrame(index=list(PNL_STANDARD_ITEMS_MAP.keys())) 
+            df_pnl_combined = pd.DataFrame(index=PNL_STANDARD_ITEMS) 
 
             for file_name_original_pdf, file_years_data in _final_data_for_display.items():
                 for year, converted_data_for_year in sorted(file_years_data.items()): 
                     pnl_data_usd = converted_data_for_year.get("EstadoResultadosUSD", {})
 
                     col_name = f"Valor - {file_name_original_pdf} ({year})" 
-                    temp_column_data = pd.Series(index=list(PNL_STANDARD_ITEMS_MAP.keys()), dtype=object) 
+                    temp_column_data = pd.Series(index=PNL_STANDARD_ITEMS, dtype=object) 
                     
-                    for standard_item_name in PNL_STANDARD_ITEMS_MAP.keys(): 
-                        found_value = None
-                        for extracted_account_name_gemini, extracted_value_gemini in pnl_data_usd.items():
-                            mapped_standard_name = PNL_SYNONYMS.get(extracted_account_name_gemini.lower())
-                            if mapped_standard_name == standard_item_name:
-                                found_value = extracted_value_gemini
-                                break 
-                        
-                        if found_value is not None:
-                            temp_column_data.loc[standard_item_name] = found_value
+                    for standard_item_name in PNL_STANDARD_ITEMS: 
+                        if standard_item_name in pnl_data_usd:
+                            temp_column_data.loc[standard_item_name] = pnl_data_usd[standard_item_name]
                 
                     df_pnl_combined[col_name] = temp_column_data
                 
