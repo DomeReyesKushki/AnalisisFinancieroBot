@@ -322,9 +322,8 @@ def map_and_aggregate_balance(raw_balance_data_nested, synonyms_map, unit):
     # raw_balance_data_nested es el diccionario que viene directamente del JSON de Gemini para BalanceGeneral
     # Ejemplo: {'ACTIVOS': {'Activo Corriente': {'FONDO FIJO DE CAJA': 699.1, 'BANCOS': 287341.76, ...}}}
     
-    # Inicializar el diccionario con las categorías estándar a 0.0
-    # Usamos BALANCE_SHEET_STANDARD_CONCEPTS_LIST que incluye los títulos y los ítems
-    aggregated_data = {concept: 0.0 for concept in [item[0] for category_list in BALANCE_SHEET_STRUCTURE.values() for item in category_list]}
+    # Inicializar el diccionario con las categorías estándar del Balance General a 0.0
+    aggregated_data = {concept: 0.0 for concept in BALANCE_SHEET_STANDARD_CONCEPTS_LIST if not concept.startswith("    ")} # Usar BALANCE_SHEET_STANDARD_CONCEPTS_LIST para inicializar
     
     # Primero, aplicar el scale factor a todos los números ANTES de la agregación
     # Esto asegura que todas las sumas se hagan con valores en unidades completas
@@ -334,14 +333,14 @@ def map_and_aggregate_balance(raw_balance_data_nested, synonyms_map, unit):
     # En ese caso, la sección no tiene sub-items para iterar.
     if not isinstance(scaled_raw_data, dict):
         # Si scaled_raw_data no es un dict, puede ser un total global directo que ya fue escalado.
-        # Intentar mapearlo si es un nombre conocido y numérico.
-        if isinstance(scaled_raw_data, (int, float)):
-            # Esto es un caso raro, pero si un total como "TOTAL ACTIVOS" vino directo aquí
-            # Y no está anidado bajo una clave como 'ACTIVOS'.
-            # Para esto, necesitaríamos que el prompt lo devolviera con la clave del total.
-            # No lo agregamos a aggregated_data si no sabemos a qué mapearlo.
-            pass # No podemos mapear un número suelto sin una clave.
-        return {concept: 0.0 for concept in BALANCE_SHEET_STANDARD_CONCEPTS_LIST if not concept.startswith("    ")} # Devolver vacío si hay un problema estructural
+        # Esto significa que Gemini devolvió algo como {"BalanceGeneral": 12345} en lugar de {"BalanceGeneral": {"ACTIVOS": {...}}}
+        # Intentamos mapear este valor si es un total global conocido.
+        mapped_total_name = synonyms_map.get(str(raw_balance_data_nested).lower()) # Intentar mapear la clave original si es un total
+        if isinstance(scaled_raw_data, (int, float)) and mapped_total_name and mapped_total_name in aggregated_data:
+            aggregated_data[mapped_total_name] = scaled_raw_data
+        else:
+            st.error(f"Error: Datos crudos escalados de Balance General no son un diccionario y no se pueden mapear como total. Tipo: {type(scaled_raw_data)}, Valor: {scaled_raw_data}")
+            return {concept: "N/A" for concept in BALANCE_SHEET_STANDARD_CONCEPTS_LIST if not concept.startswith("    ")} # Devolver N/A si hay un error
     
     # Recorrer las secciones principales (ACTIVOS, PASIVOS, CAPITAL) del JSON de Gemini
     for section_name_outer, section_content_outer in scaled_raw_data.items():
@@ -359,7 +358,7 @@ def map_and_aggregate_balance(raw_balance_data_nested, synonyms_map, unit):
                 elif isinstance(sub_section_content, (int, float)): # Si el contenido de la sub-sección es un total directo
                     mapped_name = synonyms_map.get(sub_section_name.lower())
                     if mapped_name and mapped_name in aggregated_data: 
-                        aggregated_data[mapped_name] = sub_section_content # Sobrescribe si es un total
+                        aggregated_data[mapped_name] = sub_section_content 
                     else:
                         st.warning(f"Advertencia: Total BG de sub-sección '{sub_section_name}' no mapeado. Valor: {sub_section_content}")
         elif isinstance(section_content_outer, (int, float)): # Para los TOTALES de nivel superior (ej. "TOTAL ACTIVOS" del JSON)
@@ -465,7 +464,6 @@ if uploaded_files_streamlit:
                 pnl_data_raw = data_from_gemini.get("EstadoResultados", {})
 
                 # Mapear y Agrupar cuentas (y aplicar escala aquí dentro)
-                # Estas funciones ahora reciben la 'unit'
                 aggregated_balance_data = map_and_aggregate_balance(balance_data_raw, BALANCE_SHEET_SYNONYMS, global_unit)
                 aggregated_pnl_data = map_and_aggregate_pnl(pnl_data_raw, PNL_SYNONYMS, global_unit)
                 
