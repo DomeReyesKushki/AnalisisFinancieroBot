@@ -166,6 +166,7 @@ def extract_financial_data(uploaded_file_content_object, api_key):
 
         **Paso 1: Identificación de Moneda y Años de Reporte.**
         -   **Moneda Global:** Identifica la moneda principal. Busca símbolos de moneda ($, €, S/, Bs), códigos ISO (USD, EUR, MXN, COP, CLP, PEN), o palabras como "Pesos Mexicanos", "Pesos Colombianos", "Soles Peruanos", "Dólares", "Euros". Si el documento menciona el país de la empresa (ej. "Mexico", "Colombia", "Chile", "Perú"), infiere la moneda local si no está explícitamente definida (ej. "Mexico" -> MXN, "Colombia" -> COP, "Chile" -> CLP, "Perú" -> PEN). Extrae el código ISO o abreviatura más común (COP, CLP, MXN, USD, EUR, PEN). Si no se puede inferir con certeza, usa "USD" como valor por defecto.
+        -   **Unidad Global (Escala):** Identifica la unidad de los valores. Si el documento dice "CLP$m", "US$m", "Expresado en millones", la unidad es "millones". Si dice "miles de pesos", la unidad es "miles". Si no indica, asume "unidades".
         -   **Años de Reporte:** Identifica TODOS los años de las columnas de DICIEMBRE disponibles (ej. 2024, 2023). Si no hay DICIEMBRE, identifica los años de las últimas 2 columnas de fecha disponibles.
 
         **Paso 2: Extracción de Valores y Nombres de Cuentas (SIN ENCASILLAMIENTO DIRECTO EN ESTE PASO).**
@@ -323,15 +324,25 @@ def map_and_aggregate_balance(raw_balance_data_nested, synonyms_map, unit):
     
     # Inicializar el diccionario con las categorías estándar a 0.0
     # Usamos BALANCE_SHEET_STANDARD_CONCEPTS_LIST que incluye los títulos y los ítems
-    aggregated_data = {concept: 0.0 for concept in BALANCE_SHEET_STANDARD_CONCEPTS_LIST if not concept.startswith("    ")} # Solo los nombres estándar, no los indentados
-
-    # Primero, aplicar el scale factor a todos los números dentro de la estructura de Gemini
-    # Asegúrate de que scaled_raw_data es un diccionario para poder iterar
+    aggregated_data = {concept: 0.0 for concept in [item[0] for category_list in BALANCE_SHEET_STRUCTURE.values() for item in category_list]}
+    
+    # Primero, aplicar el scale factor a todos los números ANTES de la agregación
+    # Esto asegura que todas las sumas se hagan con valores en unidades completas
     scaled_raw_data = apply_scale_factor_to_raw_data(raw_balance_data_nested, unit)
-    if not isinstance(scaled_raw_data, dict):
-        st.error(f"Error: Datos crudos escalados de Balance General no son un diccionario: {type(scaled_raw_data)}")
-        return {concept: "N/A" for concept in BALANCE_SHEET_STANDARD_CONCEPTS_LIST if not concept.startswith("    ")} # Devolver N/A si hay un error
 
+    # REVISIÓN CRÍTICA AQUÍ: scaled_raw_data puede no ser un diccionario si Gemini devolvió un valor directo.
+    # En ese caso, la sección no tiene sub-items para iterar.
+    if not isinstance(scaled_raw_data, dict):
+        # Si scaled_raw_data no es un dict, puede ser un total global directo que ya fue escalado.
+        # Intentar mapearlo si es un nombre conocido y numérico.
+        if isinstance(scaled_raw_data, (int, float)):
+            # Esto es un caso raro, pero si un total como "TOTAL ACTIVOS" vino directo aquí
+            # Y no está anidado bajo una clave como 'ACTIVOS'.
+            # Para esto, necesitaríamos que el prompt lo devolviera con la clave del total.
+            # No lo agregamos a aggregated_data si no sabemos a qué mapearlo.
+            pass # No podemos mapear un número suelto sin una clave.
+        return {concept: 0.0 for concept in BALANCE_SHEET_STANDARD_CONCEPTS_LIST if not concept.startswith("    ")} # Devolver vacío si hay un problema estructural
+    
     # Recorrer las secciones principales (ACTIVOS, PASIVOS, CAPITAL) del JSON de Gemini
     for section_name_outer, section_content_outer in scaled_raw_data.items():
         if isinstance(section_content_outer, dict): # Si es una sección con sub-secciones (ej. "ACTIVOS", "PASIVOS")
@@ -348,7 +359,7 @@ def map_and_aggregate_balance(raw_balance_data_nested, synonyms_map, unit):
                 elif isinstance(sub_section_content, (int, float)): # Si el contenido de la sub-sección es un total directo
                     mapped_name = synonyms_map.get(sub_section_name.lower())
                     if mapped_name and mapped_name in aggregated_data: 
-                        aggregated_data[mapped_name] = sub_section_content 
+                        aggregated_data[mapped_name] = sub_section_content # Sobrescribe si es un total
                     else:
                         st.warning(f"Advertencia: Total BG de sub-sección '{sub_section_name}' no mapeado. Valor: {sub_section_content}")
         elif isinstance(section_content_outer, (int, float)): # Para los TOTALES de nivel superior (ej. "TOTAL ACTIVOS" del JSON)
@@ -368,7 +379,7 @@ def map_and_aggregate_pnl(raw_pnl_data_nested, synonyms_map, unit):
 
     if not isinstance(scaled_raw_data, dict):
         st.error(f"Error: Datos crudos escalados de PnL no son un diccionario: {type(scaled_raw_data)}")
-        return {concept: "N/A" for concept in PNL_STANDARD_CONCEPTS} 
+        return {concept: 0.0 for concept in PNL_STANDARD_CONCEPTS} 
 
     for section_name, section_content in scaled_raw_data.items():
         if isinstance(section_content, dict): 
@@ -388,7 +399,6 @@ def map_and_aggregate_pnl(raw_pnl_data_nested, synonyms_map, unit):
 
 
 def convert_to_usd(data_dict, currency_code, report_year): 
-    # Esta función ahora asume que data_dict ya tiene la escala de unidades aplicada (miles/millones)
     exchange_rate = get_exchange_rate(currency_code, date=report_year)
     
     st.write(f"DEBUG: Conversión - Moneda: {currency_code}, Año: {report_year}, Tasa USD: {exchange_rate}")
@@ -454,7 +464,7 @@ if uploaded_files_streamlit:
                 balance_data_raw = data_from_gemini.get("BalanceGeneral", {})
                 pnl_data_raw = data_from_gemini.get("EstadoResultados", {})
 
-                # Aplicar Factor de Escala Y LUEGO Mapear y Agrupar cuentas
+                # Mapear y Agrupar cuentas (y aplicar escala aquí dentro)
                 # Estas funciones ahora reciben la 'unit'
                 aggregated_balance_data = map_and_aggregate_balance(balance_data_raw, BALANCE_SHEET_SYNONYMS, global_unit)
                 aggregated_pnl_data = map_and_aggregate_pnl(pnl_data_raw, PNL_SYNONYMS, global_unit)
@@ -492,16 +502,16 @@ if uploaded_files_streamlit:
                     balance_data_usd = converted_data_for_year.get("BalanceGeneralUSD", {})
                     
                     col_name = f"Valor - {file_name_original_pdf} ({year})" 
-                    temp_column_data = pd.Series(index=all_balance_concepts_ordered, dtype=object)
+                    temp_column_data = pd.Series(index=all_balance_concepts_display_order, dtype=object)
 
                     for concept_to_display in all_balance_concepts_display_order:
                         standard_name_no_indent = concept_to_display.strip() 
 
                         if standard_name_no_indent in balance_data_usd and isinstance(balance_data_usd[standard_name_no_indent], (int, float)):
                             temp_column_data.loc[concept_to_display] = balance_data_usd[standard_name_no_indent]
-                        elif standard_name_no_indent in [cat_item[0] for category_list in BALANCE_SHEET_STRUCTURE.values() for cat_item in category_list if isinstance(cat_item, tuple)]: # Es un ítem detallado que debería tener valor
+                        elif standard_name_no_indent in [cat_item[0] for category_list in BALANCE_SHEET_STRUCTURE.values() for cat_item in category_list if isinstance(cat_item, tuple)]: 
                             pass 
-                        elif standard_name_no_indent in [cat_name for cat_name in BALANCE_SHEET_STRUCTURE.keys() if cat_name == concept_to_display]: # Es un título de categoría (ej. "Activos Corrientes")
+                        elif standard_name_no_indent in BALANCE_SHEET_STRUCTURE.keys(): # Esto cubre los títulos de categoría.
                              temp_column_data.loc[concept_to_display] = "" 
                         else: 
                              pass 
