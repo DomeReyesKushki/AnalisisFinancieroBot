@@ -1,4 +1,4 @@
-import streamlit as st 
+ import streamlit as st 
 import pandas as pd
 import google.generativeai as genai
 import os
@@ -108,7 +108,7 @@ EXCHANGE_RATES_BY_YEAR_TO_USD = {
     },
     2024: { 
         "EUR": 1.0850, 
-        "MXN": 0.0482, 
+        "MXN": 0.0482, # CORREGIDO AQUÍ
         "PEN": 0.2680, 
         "COP": 0.00024, 
         "CLP": 0.0011, 
@@ -323,18 +323,21 @@ def map_and_aggregate_balance(raw_balance_data_nested, synonyms_map, unit):
     # Ejemplo: {'ACTIVOS': {'Activo Corriente': {'FONDO FIJO DE CAJA': 699.1, 'BANCOS': 287341.76, ...}}}
     
     # Inicializar el diccionario con las categorías estándar a 0.0
-    aggregated_data_final = {concept.strip(): 0.0 for concept in BALANCE_SHEET_STANDARD_CONCEPTS_LIST} 
+    aggregated_data_final = {concept.strip(): 0.0 for concept in BALANCE_SHEET_STANDARD_CONCEPTS_LIST} # Usar BALANCE_SHEET_STANDARD_CONCEPTS_LIST para inicializar
 
     # Primero, aplicar el scale factor a todos los números ANTES de la agregación
     # Esto asegura que todas las sumas se hagan con valores en unidades completas
     scaled_raw_data = apply_scale_factor_to_raw_data(raw_balance_data_nested, unit)
 
-    # Si scaled_raw_data no es un dict, puede ser un total global directo que ya fue escalado.
+    # REVISIÓN CRÍTICA AQUÍ: scaled_raw_data puede no ser un diccionario si Gemini devolvió un valor directo.
+    # En ese caso, la sección no tiene sub-items para iterar.
     if not isinstance(scaled_raw_data, dict):
         st.warning(f"Advertencia: Datos crudos escalados de Balance General no son un diccionario: {type(scaled_raw_data)}. Se intentará mapear como un total global si su clave original lo permite.")
-        # Intentar mapear este valor si es un nombre de total conocido (ej. "TOTAL ACTIVOS")
-        # Aquí, raw_balance_data_nested es el diccionario original ANTES de apply_scale_factor_to_raw_data.
-        # Necesitamos la clave original para mapearla.
+        # Intentar mapear este valor si es un nombre de total conocido.
+        # Esto es un caso límite si Gemini no sigue la estructura anidada.
+        
+        # Si raw_balance_data_nested es un diccionario y tiene una clave con el valor directo
+        # ej. {'TOTAL_ACTIVOS': 123}
         if isinstance(raw_balance_data_nested, dict) and len(raw_balance_data_nested) == 1:
             key_name_original = list(raw_balance_data_nested.keys())[0]
             mapped_name = synonyms_map.get(key_name_original.lower())
@@ -343,9 +346,9 @@ def map_and_aggregate_balance(raw_balance_data_nested, synonyms_map, unit):
                     aggregated_data_final[mapped_name] = scaled_raw_data
                  else:
                     st.error(f"Error: Total global mapeado '{mapped_name}' no es un número: {type(scaled_raw_data)}")
-        else: 
+        else: # Si no es ni un diccionario anidado, ni un total directo con clave conocida.
             st.error(f"Error: Formato inesperado para datos de Balance General después de escalar: {type(scaled_raw_data)}, Valor: {scaled_raw_data}. No se pudo procesar la agregación.")
-        return aggregated_data_final 
+        return aggregated_data_final # Devuelve los datos inicializados a 0.0 o con el total si se mapeó
     
     # Recorrer las secciones principales (ACTIVOS, PASIVOS, CAPITAL) del JSON de Gemini
     for section_name_outer, section_content_outer in scaled_raw_data.items():
@@ -491,12 +494,12 @@ if uploaded_files_streamlit:
             st.subheader("Balance General (Valores en USD)")
             
             all_balance_concepts_display_order = []
-            for category_name, items_list_in_structure in BALANCE_SHEET_STRUCTURE.items():
+            for category_name, items_list in BALANCE_SHEET_STRUCTURE.items():
                 all_balance_concepts_display_order.append(category_name) 
-                if isinstance(items_list_in_structure, list) and items_list_in_structure and isinstance(items_list_in_structure[0], tuple):
-                    all_balance_concepts_display_order.extend([f"    {item_pair[0]}" for item_pair in items_list_in_structure]) 
-                elif isinstance(items_list_in_structure, list):
-                    all_balance_concepts_display_order.extend([f"    {item}" for item in items_list_in_structure])
+                if isinstance(items_list, list) and items_list and isinstance(items_list[0], tuple):
+                    all_balance_concepts_display_order.extend([f"    {item_pair[0]}" for item_pair in items_list]) 
+                elif isinstance(items_list, list):
+                    all_balance_concepts_display_order.extend([f"    {item}" for item in items_list])
 
             df_balance_combined = pd.DataFrame(index=all_balance_concepts_ordered) 
             
@@ -505,7 +508,7 @@ if uploaded_files_streamlit:
                     balance_data_usd = converted_data_for_year.get("BalanceGeneralUSD", {})
                     
                     col_name = f"Valor - {file_name_original_pdf} ({year})" 
-                    temp_column_data = pd.Series(index=all_balance_concepts_ordered, dtype=object)
+                    temp_column_data = pd.Series(index=all_balance_concepts_display_order, dtype=object)
 
                     for concept_to_display in all_balance_concepts_display_order:
                         standard_name_no_indent = concept_to_display.strip() 
