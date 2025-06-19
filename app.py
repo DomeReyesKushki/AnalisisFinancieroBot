@@ -18,26 +18,27 @@ else:
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # --- Estructura del Balance General con SINÓNIMOS para mapeo ---
+# Cada item ahora es SOLO el nombre estándar. La lista de sinónimos se usa solo en el diccionario SYNONYMS.
 BALANCE_SHEET_STRUCTURE = {
     "Activos Corrientes": [
         ("Inventarios", ["Inventarios", "Inventario Equipos"]),
         ("Efectivo y equivalentes de efectivo", ["Efectivo y equivalentes de efectivo", "Efectivo y depósitos", "Bancos", "Caja", "Fondo Fijo de Caja", "Caja y Bancos"]), 
         ("Cuentas por cobrar", ["Cuentas por cobrar", "Clientes", "Deudores", "Cuentas por cobrar comerciales", "Cuentas por cobrar a empresas relacionadas CP", "Deudores diversos"]), 
         ("Gasto Anticipado", ["Gasto Anticipado", "Gastos pagados por anticipado", "Pagos anticipados", "Impuestos a favor", "Pagos provisionales"]), 
-        ("Otros activos", ["Otros activos", "Otros activos corrientes", "Activos por Impuestos", "Activos financieros"]), 
+        ("Otros activos", ["Otros activos", "Otros activos corrientes", "Activos por Impuestos", "Activos financieros"]), # Añadido Activos financieros aquí
         ("Total Activo Corriente", ["Total Activo Corriente", "Total Activo a Corto Plazo", "Total Activo Corriente Netos", "TOTAL ACTIVO CIRCULANTE"]) 
     ],
     "Activos No Corrientes": [
         ("Propiedad, planta y equipo", ["Propiedad, planta y equipo", "Propiedad Planta y Equipo", "Activo Fijo", "Activo Fijo Neto"]), 
         ("Intangibles (Software)", ["Intangibles (Software)", "Intangibles"]), 
-        ("Otros Activos No Corrientes", ["Otros Activos No Corrientes", "Activos diferidos", "Otros activos no corrientes", "Activos a largo plazo"]),
+        ("Otros Activos No Corrientes", ["Otros Activos No Corrientes", "Activos diferidos", "Otros activos no corrientes", "Activos a largo plazo", "Depósitos en garantía"]), # Añadido Depósitos en garantía aquí
         ("Total Activo No Corriente", ["Total Activo No Corriente", "Total Activo Fijo", "Total Activo a largo plazo", "TOTAL ACTIVO NO CIRCULANTE"]) 
     ],
     "TOTAL ACTIVOS": [("TOTAL ACTIVOS", ["TOTAL ACTIVOS", "Total Activo", "SUMA DEL ACTIVO"])], 
     "Pasivos a Corto Plazo": [
         ("Préstamos y empréstitos corrientes", ["Préstamos y empréstitos corrientes", "Préstamos bancarios a corto plazo"]),
         ("Obligaciones Financieras", ["Obligaciones Financieras", "Préstamos"]), 
-        ("Cuentas comerciales y otras cuentas por pagar", ["Cuentas comerciales y otras cuentas por pagar", "Acreedores diversos", "Proveedores"]), 
+        ("Cuentas comerciales y otras cuentas por pagar", ["Cuentas comerciales y otras cuentas por pagar", "Acreedores diversos", "Proveedores"]), # Añadido Proveedores
         ("Cuentas por Pagar", ["Cuentas por Pagar", "Proveedores"]), 
         ("Pasivo Laborales", ["Pasivo Laborales", "Provisiones para sueldos y salarios", "Remuneraciones por pagar", "Provisión de sueldos y salarios x pagar", "Provisión de contribuciones segsocial x pagar"]), 
         ("Anticipos", ["Anticipos", "Anticipos de clientes"]), 
@@ -56,9 +57,9 @@ BALANCE_SHEET_STRUCTURE = {
     "Patrimonio Atribuible a los Propietarios de la Matriz": [
         ("Capital social", ["Capital social", "Capital Emitido", "Capital Social"]), 
         ("Aportes Para Futuras Capitalizaciones", ["Aportes Para Futuras Capitalizaciones"]), 
-        ("Resultados Ejerc. Anteriores", ["Resultados Ejerc. Anteriores", "Ganancias retenidas"]), 
+        ("Resultados Ejerc. Anteriores", ["Resultados Ejerc. Anteriores", "Ganancias retenidas", "Resultado de Ejercicios Anteriores"]), # Añadido
         ("Resultado del Ejercicio", ["Resultado del Ejercicio", "Utilidad del período", "Utilidad o Pérdida del Ejercicio"]), 
-        ("Otros componentes del patrimonio", ["Otros componentes del patrimonio", "Otras reservas", "Patrimonio Minoritario", "Impuestos retenidos"]), 
+        ("Otros componentes del patrimonio", ["Otros componentes del patrimonio", "Otras reservas", "Patrimonio Minoritario", "Impuestos retenidos", "Capital Variable"]), 
         ("TOTAL PATRIMONIO", ["TOTAL PATRIMONIO", "Total Patrimonio", "SUMA DEL CAPITAL", "TOTAL CAPITAL"]) 
     ],
     "TOTAL PASIVO Y PATRIMONIO": [("TOTAL PASIVO Y PATRIMONIO", ["TOTAL PASIVO Y PATRIMONIO", "Total Pasivo y Patrimonio", "SUMA DEL PASIVO Y CAPITAL"])] 
@@ -68,8 +69,12 @@ BALANCE_SHEET_STRUCTURE = {
 BALANCE_SHEET_STANDARD_CONCEPTS_LIST = []
 for category_name, items_list in BALANCE_SHEET_STRUCTURE.items():
     BALANCE_SHEET_STANDARD_CONCEPTS_LIST.append(category_name) 
-    for standard_name, _ in items_list: 
-        BALANCE_SHEET_STANDARD_CONCEPTS_LIST.append(f"    {standard_name}")
+    # Asegurarse de que solo accedemos al nombre estándar (primer elemento de la tupla)
+    if isinstance(items_list, list) and items_list and isinstance(items_list[0], tuple):
+        BALANCE_SHEET_STANDARD_CONCEPTS_LIST.extend([f"    {item_pair[0]}" for item_pair in items_list]) 
+    else: # Para el caso donde items_list podría ser solo [("TOTAL_STRING", [...])]
+        BALANCE_SHEET_STANDARD_CONCEPTS_LIST.extend([f"    {item_pair[0]}" for item_pair in items_list])
+
 
 # Diccionario de sinónimos para facilitar el mapeo en el código (llave es sinónimo.lower(), valor es el nombre estándar)
 BALANCE_SHEET_SYNONYMS = {}
@@ -108,7 +113,7 @@ EXCHANGE_RATES_BY_YEAR_TO_USD = {
     },
     2024: { 
         "EUR": 1.0850, 
-        "MXN": 0.0482, 
+        "MXN": 0.0482, # CORREGIDO AQUI
         "PEN": 0.2680, 
         "COP": 0.00024, 
         "CLP": 0.0011, 
@@ -323,11 +328,8 @@ def map_and_aggregate_balance(raw_balance_data_nested, synonyms_map, unit):
     # Ejemplo: {'ACTIVOS': {'Activo Corriente': {'FONDO FIJO DE CAJA': 699.1, 'BANCOS': 287341.76, ...}}}
     
     # Inicializar el diccionario con las categorías estándar a 0.0
-    # Usamos BALANCE_SHEET_STANDARD_CONCEPTS_LIST para inicializar
-    # OJO: Los conceptos en BALANCE_SHEET_STANDARD_CONCEPTS_LIST tienen indentación ("    ")
-    # Si las claves del diccionario final no deben tener indentación, inicializar con el nombre estándar sin indentar
-    aggregated_data_final = {concept.strip(): 0.0 for concept in BALANCE_SHEET_STANDARD_CONCEPTS_LIST}
-    
+    aggregated_data_final = {concept.strip(): 0.0 for concept in BALANCE_SHEET_STANDARD_CONCEPTS_LIST} 
+
     # Primero, aplicar el scale factor a todos los números ANTES de la agregación
     # Esto asegura que todas las sumas se hagan con valores en unidades completas
     scaled_raw_data = apply_scale_factor_to_raw_data(raw_balance_data_nested, unit)
@@ -339,14 +341,24 @@ def map_and_aggregate_balance(raw_balance_data_nested, synonyms_map, unit):
         # Esto significa que Gemini devolvió algo como {"BalanceGeneral": 12345} en lugar de {"BalanceGeneral": {"ACTIVOS": {...}}}
         # Intentamos mapear este valor si es un nombre de total conocido.
         # Esto es un caso límite si Gemini no sigue la estructura anidada.
-        st.warning(f"Advertencia: Datos crudos escalados de Balance General no son un diccionario: {type(scaled_raw_data)}. Intentando mapear como un total global.")
-        # Buscar el nombre estándar para esta clave principal si es un total global directo (ej. "TOTAL ACTIVOS")
-        mapped_name = synonyms_map.get(str(raw_balance_data_nested).lower()) 
-        if isinstance(scaled_raw_data, (int, float)) and mapped_name and mapped_name in aggregated_data_final:
-            aggregated_data_final[mapped_name] = scaled_raw_data
-        else:
-            st.error(f"Error: Datos crudos escalados de Balance General no son un diccionario y no se pueden mapear como total. Tipo: {type(scaled_raw_data)}, Valor: {scaled_raw_data}")
-            return {concept.strip(): "N/A" for concept in BALANCE_SHEET_STANDARD_CONCEPTS_LIST} # Devolver N/A si hay un error
+        st.warning(f"Advertencia: Datos crudos escalados de Balance General no son un diccionario: {type(scaled_raw_data)}. Se intentará mapear como un total global si su clave original lo permite.")
+        # La clave original para `raw_balance_data_nested` es el nombre de la sección (ej. "BalanceGeneral").
+        # Necesitamos buscar ese nombre en los sinónimos de totales.
+        # Esto es un parche, la mejor solución es que Gemini siga la estructura siempre.
+        
+        # Si raw_balance_data_nested es un diccionario y tiene una clave con el valor directo
+        # ej. {'TOTAL_ACTIVOS': 123}
+        if isinstance(raw_balance_data_nested, dict) and len(raw_balance_data_nested) == 1:
+            key_name_original = list(raw_balance_data_nested.keys())[0]
+            mapped_name = synonyms_map.get(key_name_original.lower())
+            if mapped_name and mapped_name in aggregated_data_final:
+                 if isinstance(scaled_raw_data, (int, float)):
+                    aggregated_data_final[mapped_name] = scaled_raw_data
+                 else:
+                    st.error(f"Error: Total global mapeado '{mapped_name}' no es un número: {type(scaled_raw_data)}")
+        else: # Si no es ni un diccionario anidado, ni un total directo con clave conocida.
+            st.error(f"Error: Formato inesperado para datos de Balance General después de escalar: {type(scaled_raw_data)}, Valor: {scaled_raw_data}. No se pudo procesar la agregación.")
+        return aggregated_data_final # Devuelve los datos inicializados a 0.0 o con el total si se mapeó
     
     # Recorrer las secciones principales (ACTIVOS, PASIVOS, CAPITAL) del JSON de Gemini
     for section_name_outer, section_content_outer in scaled_raw_data.items():
@@ -356,7 +368,7 @@ def map_and_aggregate_balance(raw_balance_data_nested, synonyms_map, unit):
                     for account_name_raw, value_raw in sub_section_content.items():
                         if value_raw is not None and isinstance(value_raw, (int, float)):
                             mapped_name = synonyms_map.get(account_name_raw.lower())
-                            if mapped_name and mapped_name in aggregated_data_final: # Asegurarse que el mapeo es a una cuenta estándar
+                            if mapped_name and mapped_name in aggregated_data_final: 
                                 aggregated_data_final[mapped_name] += value_raw
                             else:
                                 st.warning(f"Advertencia: Cuenta BG detallada '{account_name_raw}' no mapeada a estándar o fuera de estructura. Valor: {value_raw}")
@@ -364,7 +376,7 @@ def map_and_aggregate_balance(raw_balance_data_nested, synonyms_map, unit):
                 elif isinstance(sub_section_content, (int, float)): # Si el contenido de la sub-sección es un total directo
                     mapped_name = synonyms_map.get(sub_section_name.lower())
                     if mapped_name and mapped_name in aggregated_data_final: 
-                        aggregated_data_final[mapped_name] = sub_section_content # Sobrescribe si es un total
+                        aggregated_data_final[mapped_name] = sub_section_content 
                     else:
                         st.warning(f"Advertencia: Total BG de sub-sección '{sub_section_name}' no mapeado. Valor: {sub_section_content}")
         elif isinstance(section_content_outer, (int, float)): # Para los TOTALES de nivel superior (ej. "TOTAL ACTIVOS" del JSON)
@@ -404,12 +416,6 @@ def map_and_aggregate_pnl(raw_pnl_data_nested, synonyms_map, unit):
 
 
 def convert_to_usd(data_dict, currency_code, report_year): 
-    # Aseguramos que data_dict es un diccionario antes de intentar iterar
-    if not isinstance(data_dict, dict):
-        st.error(f"Error: data_dict para conversión a USD no es un diccionario: {type(data_dict)}, Valor: {data_dict}")
-        # Retornar un diccionario vacío o con N/A para evitar más errores.
-        return {k: "N/A" for k in data_dict.keys()} if isinstance(data_dict, dict) else {}
-
     exchange_rate = get_exchange_rate(currency_code, date=report_year)
     
     st.write(f"DEBUG: Conversión - Moneda: {currency_code}, Año: {report_year}, Tasa USD: {exchange_rate}")
@@ -505,7 +511,7 @@ if uploaded_files_streamlit:
                 elif isinstance(items_list_in_structure, list):
                     all_balance_concepts_display_order.extend([f"    {item}" for item in items_list_in_structure])
 
-            df_balance_combined = pd.DataFrame(index=all_balance_concepts_display_order) 
+            df_balance_combined = pd.DataFrame(index=all_balance_concepts_ordered) 
             
             for file_name_original_pdf, file_years_data in _final_data_for_display.items():
                 for year, converted_data_for_year in sorted(file_years_data.items()): 
