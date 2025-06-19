@@ -108,7 +108,7 @@ EXCHANGE_RATES_BY_YEAR_TO_USD = {
     },
     2024: { 
         "EUR": 1.0850, 
-        "MXN": 0.0585, 
+        "MXN": 0.0482, 
         "PEN": 0.2680, 
         "COP": 0.00024, 
         "CLP": 0.0011, 
