@@ -182,7 +182,7 @@ def extract_financial_data(uploaded_file_content_object, api_key):
           "ReportesPorAnio": [
             {{
               "Anio": "2024",
-              "BalanceGeneral": {{
+              "BalanceGeneral": {{ 
                 "ACTIVOS": {{
                     "Activo Corriente": {{
                         "Nombre de cuenta del documento 1": valor,
@@ -319,63 +319,77 @@ def apply_scale_factor_to_raw_data(data_nested, unit):
 
 # Función auxiliar para mapear y agregar cuentas de Balance General
 def map_and_aggregate_balance(raw_balance_data_nested, synonyms_map, unit):
-    # raw_balance_data_nested es el diccionario que viene directamente del JSON de Gemini para BalanceGeneral
-    
     # Inicializar el diccionario con las categorías estándar a 0.0
     aggregated_data_final = {concept.strip(): 0.0 for concept in BALANCE_SHEET_STANDARD_CONCEPTS_LIST} 
 
     # Primero, aplicar el scale factor a todos los números ANTES de la agregación
+    # Esto asegura que todas las sumas se hagan con valores en unidades completas
     scaled_raw_data = apply_scale_factor_to_raw_data(raw_balance_data_nested, unit)
 
     # REVISIÓN CRÍTICA AQUÍ: scaled_raw_data puede no ser un diccionario si Gemini devolvió un valor directo.
+    # En ese caso, la sección no tiene sub-items para iterar.
     if not isinstance(scaled_raw_data, dict):
-        # Si scaled_raw_data no es un dict, puede ser un total global directo que ya fue escalado.
-        # Intentamos mapear este valor si es un nombre de total conocido.
         st.warning(f"Advertencia: Datos crudos escalados de Balance General no son un diccionario: {type(scaled_raw_data)}. Se intentará mapear como un total global si su clave original lo permite.")
         
-        # Este es un parche si Gemini devuelve {"BalanceGeneral": TOTAL_NUMERICO}
-        # En este caso, asumimos que 'raw_balance_data_nested' (antes de escalar) contiene la clave del total
+        # Este es un parche si Gemini devuelve {"BalanceGeneral": 12345} en lugar de {"BalanceGeneral": {"ACTIVOS": {...}}}
+        # En este caso, `raw_balance_data_nested` es el diccionario original que contenía el total.
+        # Necesitamos la clave original para mapearla.
         if isinstance(raw_balance_data_nested, dict) and len(raw_balance_data_nested) == 1:
             key_name_original = list(raw_balance_data_nested.keys())[0] # Obtener la clave (ej. "TOTAL ACTIVOS")
             mapped_name = synonyms_map.get(key_name_original.lower())
             if mapped_name and mapped_name in aggregated_data_final:
-                if isinstance(scaled_raw_data, (int, float)):
+                 if isinstance(scaled_raw_data, (int, float)):
                     aggregated_data_final[mapped_name] = scaled_raw_data
-                else: # Si el valor escalar no es un número, algo está mal
-                    st.error(f"Error: Total global mapeado '{mapped_name}' no es un número después de escalar: {type(scaled_raw_data)}. Valor: {scaled_raw_data}")
-            else: # No se mapeó a una clave estándar, o no es un total directo
-                st.warning(f"Advertencia: Total global '{key_name_original}' no se pudo mapear a una categoría estándar. Valor: {scaled_raw_data}")
-        else: # Si no es un dict anidado y tampoco un simple {TOTAL: valor}
+                 else:
+                    st.error(f"Error: Total global mapeado '{mapped_name}' no es un número: {type(scaled_raw_data)}")
+        else: # Si no es ni un diccionario anidado, ni un total directo con clave conocida.
             st.error(f"Error: Formato inesperado para datos de Balance General después de escalar: {type(scaled_raw_data)}, Valor: {scaled_raw_data}. No se pudo procesar la agregación.")
         
-        return aggregated_data_final 
+        return aggregated_data_final # Devuelve los datos inicializados a 0.0 o con el total si se mapeó
     
     # Recorrer las secciones principales (ACTIVOS, PASIVOS, CAPITAL) del JSON de Gemini
     for section_name_outer, section_content_outer in scaled_raw_data.items():
-        if isinstance(section_content_outer, dict): # Si es una sección con sub-secciones (ej. "ACTIVOS", "PASIVOS")
-            for sub_section_name, sub_section_content in section_content_outer.items():
-                if isinstance(sub_section_content, dict): # Si es una sub-sección con cuentas detalladas (ej. "Activo Corriente")
-                    for account_name_raw, value_raw in sub_section_content.items():
-                        if value_raw is not None and isinstance(value_raw, (int, float)):
-                            mapped_name = synonyms_map.get(account_name_raw.lower())
-                            if mapped_name and mapped_name in aggregated_data_final: 
-                                aggregated_data_final[mapped_name] += value_raw
-                            else:
-                                st.warning(f"Advertencia: Cuenta BG detallada '{account_name_raw}' no mapeada a estándar o fuera de estructura. Valor: {value_raw}")
-                # Manejar totales de sub-sección si están directamente bajo la sección principal (ej. "TOTAL ACTIVO CIRCULANTE")
-                elif isinstance(sub_section_content, (int, float)): 
-                    mapped_name = synonyms_map.get(sub_section_name.lower())
-                    if mapped_name and mapped_name in aggregated_data_final: 
-                        aggregated_data_final[mapped_name] = sub_section_content 
-                    else:
-                        st.warning(f"Advertencia: Total BG de sub-sección '{sub_section_name}' no mapeado. Valor: {sub_section_content}")
-        elif isinstance(section_content_outer, (int, float)): # Para los TOTALES de nivel superior (ej. "TOTAL ACTIVOS" del JSON)
+        # AHORA AQUÍ: Si section_content_outer NO es un diccionario, pasamos al siguiente.
+        if not isinstance(section_content_outer, dict):
+            # Podría ser un total como "TOTAL ACTIVO": valor directamente aquí. Mapearlo.
             mapped_name = synonyms_map.get(section_name_outer.lower())
-            if mapped_name and mapped_name in aggregated_data_final:
-                aggregated_data_final[mapped_name] = section_content_outer 
+            if mapped_name and mapped_name in aggregated_data_final and isinstance(section_content_outer, (int, float)):
+                aggregated_data_final[mapped_name] = section_content_outer
             else:
-                st.warning(f"Advertencia: Total BG de nivel superior '{section_name_outer}' no mapeado. Valor: {section_content_outer}")
+                st.warning(f"Advertencia: Sección '{section_name_outer}' no es un diccionario y no se mapeó como total. Valor: {section_content_outer}")
+            continue # Pasar a la siguiente sección si no es un diccionario.
+
+        # Si es un diccionario, procesamos sus sub-secciones
+        for sub_section_name, sub_section_content in section_content_outer.items():
+            if isinstance(sub_section_content, dict): # Si es una sub-sección con cuentas detalladas (ej. "Activo Corriente")
+                for account_name_raw, value_raw in sub_section_content.items():
+                    if value_raw is not None and isinstance(value_raw, (int, float)):
+                        mapped_name = synonyms_map.get(account_name_raw.lower())
+                        if mapped_name and mapped_name in aggregated_data_final: 
+                            aggregated_data_final[mapped_name] += value_raw
+                        else:
+                            st.warning(f"Advertencia: Cuenta BG detallada '{account_name_raw}' no mapeada a estándar o fuera de estructura. Valor: {value_raw}")
+            # Manejar totales de sub-sección si están directamente bajo la sección principal (ej. "TOTAL ACTIVO CIRCULANTE")
+            elif isinstance(sub_section_content, (int, float)): 
+                mapped_name = synonyms_map.get(sub_section_name.lower())
+                if mapped_name and mapped_name in aggregated_data_final: 
+                    aggregated_data_final[mapped_name] = sub_section_content 
+                else:
+                    st.warning(f"Advertencia: Total BG de sub-sección '{sub_section_name}' no mapeado. Valor: {sub_section_content}")
     
+    # Recorrer los totales principales que puedan venir directamente en la raíz de BalanceGeneral
+    # No es necesario iterar de nuevo sobre scaled_raw_data.items() aquí si ya lo hicimos arriba
+    # La lógica ya debería haber mapeado los totales si section_content_outer era un int.
+    # Esto es solo una verificación final
+    for total_key in ["TOTAL ACTIVOS", "TOTAL PASIVOS", "TOTAL PATRIMONIO", "TOTAL PASIVO Y PATRIMONIO"]:
+        if total_key.lower() in synonyms_map:
+            standard_total_name = synonyms_map[total_key.lower()]
+            # Si el total ya fue mapeado y puesto en aggregated_data_final, lo dejamos.
+            # Sino, lo buscamos directamente en la raíz de scaled_raw_data (si Gemini lo puso ahí).
+            if standard_total_name not in aggregated_data_final or aggregated_data_final[standard_total_name] == 0.0:
+                if total_key in scaled_raw_data and isinstance(scaled_raw_data[total_key], (int, float)):
+                    aggregated_data_final[standard_total_name] = scaled_raw_data[total_key]
+
     return aggregated_data_final
 
 # Función auxiliar para mapear y agregar cuentas de Estado de Pérdidas y Ganancias
@@ -508,7 +522,7 @@ if uploaded_files_streamlit:
                     balance_data_usd = converted_data_for_year.get("BalanceGeneralUSD", {})
                     
                     col_name = f"Valor - {file_name_original_pdf} ({year})" 
-                    temp_column_data = pd.Series(index=all_balance_concepts_ordered, dtype=object)
+                    temp_column_data = pd.Series(index=all_balance_concepts_display_order, dtype=object)
 
                     for concept_to_display in all_balance_concepts_display_order:
                         standard_name_no_indent = concept_to_display.strip() 
@@ -568,24 +582,4 @@ if uploaded_files_streamlit:
                         st.info("Nota: El Balance General está vacío y no se exportó a Excel.")
                         
                     if not df_pnl_combined.empty:
-                        df_pnl_combined.to_excel(writer, sheet_name='EstadoResultados_USD', index=True)
-                    else:
-                        st.info("Nota: El Estado de Pérdidas y Ganancias está vacío y no se exportó a Excel.")
-                
-                output_excel_buffer.seek(0)
-                
-                st.download_button(
-                    label="Descargar Estados Financieros en Excel",
-                    data=output_excel_buffer,
-                    file_name="EstadosFinancieros_Convertidos_USD.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-
-            except Exception as e:
-                st.error(f"Error al exportar a Excel: {e}")
-
-        else: 
-            st.error("No se pudieron extraer o convertir datos de los PDFs. Asegúrate de que los documentos sean legibles y contengan estados financieros estándar.")
-
-else:
-    st.info("Sube tus archivos PDF y haz clic en 'Procesar y Convertir a USD' para comenzar.")
+                        df_pnl_combined.to_excel(writer, sheet_name='EstadoRe
