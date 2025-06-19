@@ -108,7 +108,7 @@ EXCHANGE_RATES_BY_YEAR_TO_USD = {
     },
     2024: { 
         "EUR": 1.0850, 
-        "MXN": 0.0482, # CORREGIDO AQUÍ
+        "MXN": 0.0482, 
         "PEN": 0.2680, 
         "COP": 0.00024, 
         "CLP": 0.0011, 
@@ -329,21 +329,12 @@ def map_and_aggregate_balance(raw_balance_data_nested, synonyms_map, unit):
     # Esto asegura que todas las sumas se hagan con valores en unidades completas
     scaled_raw_data = apply_scale_factor_to_raw_data(raw_balance_data_nested, unit)
 
-    # REVISIÓN CRÍTICA AQUÍ: scaled_raw_data puede no ser un diccionario si Gemini devolvió un valor directo.
-    # En ese caso, la sección no tiene sub-items para iterar.
+    # Si scaled_raw_data no es un dict, puede ser un total global directo que ya fue escalado.
     if not isinstance(scaled_raw_data, dict):
-        # Si scaled_raw_data no es un dict, puede ser un total global directo que ya fue escalado.
-        # Esto significa que Gemini devolvió algo como {"BalanceGeneral": 12345} en lugar de {"BalanceGeneral": {"ACTIVOS": {...}}}
-        # Intentamos mapear este valor si es un nombre de total conocido.
-        # Esto es un caso límite si Gemini no sigue la estructura anidada.
         st.warning(f"Advertencia: Datos crudos escalados de Balance General no son un diccionario: {type(scaled_raw_data)}. Se intentará mapear como un total global si su clave original lo permite.")
-        # Buscar el nombre estándar para esta clave principal si es un total global directo (ej. "TOTAL ACTIVOS")
-        # Aquí, `raw_balance_data_nested` es el diccionario original antes de escalar.
+        # Intentar mapear este valor si es un nombre de total conocido (ej. "TOTAL ACTIVOS")
+        # Aquí, raw_balance_data_nested es el diccionario original ANTES de apply_scale_factor_to_raw_data.
         # Necesitamos la clave original para mapearla.
-        # Esto es un parche, la mejor solución es que Gemini siga la estructura siempre.
-        
-        # Si raw_balance_data_nested es un diccionario y tiene una clave con el valor directo
-        # ej. {'TOTAL_ACTIVOS': 123}
         if isinstance(raw_balance_data_nested, dict) and len(raw_balance_data_nested) == 1:
             key_name_original = list(raw_balance_data_nested.keys())[0]
             mapped_name = synonyms_map.get(key_name_original.lower())
@@ -352,9 +343,9 @@ def map_and_aggregate_balance(raw_balance_data_nested, synonyms_map, unit):
                     aggregated_data_final[mapped_name] = scaled_raw_data
                  else:
                     st.error(f"Error: Total global mapeado '{mapped_name}' no es un número: {type(scaled_raw_data)}")
-        else: # Si no es ni un diccionario anidado, ni un total directo con clave conocida.
+        else: 
             st.error(f"Error: Formato inesperado para datos de Balance General después de escalar: {type(scaled_raw_data)}, Valor: {scaled_raw_data}. No se pudo procesar la agregación.")
-        return aggregated_data_final # Devuelve los datos inicializados a 0.0 o con el total si se mapeó
+        return aggregated_data_final 
     
     # Recorrer las secciones principales (ACTIVOS, PASIVOS, CAPITAL) del JSON de Gemini
     for section_name_outer, section_content_outer in scaled_raw_data.items():
@@ -478,7 +469,6 @@ if uploaded_files_streamlit:
                 pnl_data_raw = data_from_gemini.get("EstadoResultados", {})
 
                 # Mapear y Agrupar cuentas (y aplicar escala aquí dentro)
-                # Estas funciones ahora reciben la 'unit'
                 aggregated_balance_data = map_and_aggregate_balance(balance_data_raw, BALANCE_SHEET_SYNONYMS, global_unit)
                 aggregated_pnl_data = map_and_aggregate_pnl(pnl_data_raw, PNL_SYNONYMS, global_unit)
                 
@@ -524,7 +514,7 @@ if uploaded_files_streamlit:
                             temp_column_data.loc[concept_to_display] = balance_data_usd[standard_name_no_indent]
                         elif standard_name_no_indent in [cat_item[0] for category_list in BALANCE_SHEET_STRUCTURE.values() for cat_item in category_list if isinstance(cat_item, tuple)]: 
                             pass 
-                        elif standard_name_no_indent in BALANCE_SHEET_STRUCTURE.keys(): 
+                        elif standard_name_no_indent in BALANCE_SHEET_STRUCTURE.keys(): # Esto cubre los títulos de categoría.
                              temp_column_data.loc[concept_to_display] = "" 
                         else: 
                              pass 
