@@ -1,11 +1,7 @@
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
-import os
-import json
-import tempfile
-import io
-import re
+import os, json, tempfile, io, re
 
 # --- Tu prompt completo para Gemini ---
 PROMPT_EXTRACTION = """
@@ -28,15 +24,8 @@ Analiza cuidadosamente el siguiente documento PDF que contiene estados financier
   "ReportesPorAnio": [
     {
       "Anio": "2024",
-      "BalanceGeneral": {
-        "FONDO FIJO DE CAJA": "699.10",
-        "BANCOS": "287,341.76",
-        …otros campos…
-      },
-      "EstadoResultados": {
-        "INGRESOS": "421,990.58",
-        …otros campos…
-      }
+      "BalanceGeneral": { … },
+      "EstadoResultados": { … }
     }
   ]
 }
@@ -44,13 +33,12 @@ Responde únicamente con ese JSON.
 """
 
 # --- Configuración de la API de Gemini ---
-if "GOOGLE_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-else:
+if "GOOGLE_API_KEY" not in st.secrets:
     st.error("Error: falta la clave GOOGLE_API_KEY en Streamlit Secrets.")
     st.stop()
+genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 
-# --- Definición de estructura y sinónimos ---
+# --- Estructura de Balance con sinónimos ---
 BALANCE_SHEET_STRUCTURE = {
     "Activos Corrientes": [
         ("Inventarios", ["inventarios", "inventario equipos"]),
@@ -71,7 +59,7 @@ BALANCE_SHEET_STRUCTURE = {
     ]
 }
 
-# Generar lista de conceptos y diccionario de sinónimos
+# Construcción de lista de conceptos y diccionario de sinónimos
 BALANCE_SHEET_STANDARD_CONCEPTS_LIST = []
 BALANCE_SHEET_SYNONYMS = {}
 for cat, items in BALANCE_SHEET_STRUCTURE.items():
@@ -102,11 +90,9 @@ EXCHANGE_RATES_BY_YEAR_TO_USD = {
 
 def get_exchange_rate(code, year):
     code = code.upper()
-    if code == "USD":
-        return 1.0
-    return EXCHANGE_RATES_BY_YEAR_TO_USD.get(year, {}).get(code, 1.0)
+    return 1.0 if code == "USD" else EXCHANGE_RATES_BY_YEAR_TO_USD.get(year, {}).get(code, 1.0)
 
-def normalize_numeric_strings(v):
+def normalize_numeric(v):
     if isinstance(v, str):
         v = v.replace(",", "")
         try:
@@ -119,30 +105,31 @@ def normalize_numeric_strings(v):
 def extract_financial_data(file_obj):
     name = file_obj.name
     st.write(f"Procesando archivo: {name}")
-    # Guardar temporalmente
+    # Guardar PDF en temp
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         tmp.write(file_obj.read())
         path = tmp.name
 
-    result = {}
+    out = {}
     try:
         part = genai.upload_file(path=path, display_name=name)
-        resp = genai.GenerativeModel("gemini-1.5-flash").generate_content([PROMPT_EXTRACTION, part], stream=False)
+        resp = genai.GenerativeModel("gemini-1.5-flash") \
+                    .generate_content([PROMPT_EXTRACTION, part], stream=False)
         st.write(">>> RESPUESTA GEMINI RAW:")
         st.text(resp.text)
 
         m = re.search(r"(\{.*\})", resp.text, flags=re.DOTALL)
         if not m:
-            st.error("No pude aislar un JSON válido.")
+            st.error("No pude aislar un JSON válido de Gemini.")
             return {}
         obj = json.loads(m.group(1))
 
         for rpt in obj.get("ReportesPorAnio", []):
             yr = int(rpt.get("Anio", 0))
             key = f"{name}_{yr}"
-            bg_raw = {k: normalize_numeric_strings(v) for k, v in rpt.get("BalanceGeneral", {}).items()}
-            er_raw = {k: normalize_numeric_strings(v) for k, v in rpt.get("EstadoResultados", {}).items()}
-            result[key] = {
+            bg_raw = {k: normalize_numeric(v) for k, v in rpt.get("BalanceGeneral", {}).items()}
+            er_raw = {k: normalize_numeric(v) for k, v in rpt.get("EstadoResultados", {}).items()}
+            out[key] = {
                 "Moneda": obj.get("Moneda", "USD"),
                 "BalanceGeneral": bg_raw,
                 "EstadoResultados": er_raw,
@@ -152,77 +139,88 @@ def extract_financial_data(file_obj):
         os.remove(path)
         if 'part' in locals():
             genai.delete_file(part.name)
-    return result
 
-def map_and_aggregate_balance(bg_dict):
+    return out
+
+def map_and_aggregate_balance(bg):
     agg = {c: 0.0 for c in BALANCE_SHEET_STANDARD_CONCEPTS_LIST}
-    for acct, val in bg_dict.items():
-        std = BALANCE_SHEET_SYNONYMS.get(acct.lower())
-        if std in agg and isinstance(val, (int, float)):
-            agg[std] += val
+    def recurse(d):
+        for k, v in d.items():
+            if isinstance(v, dict):
+                recurse(v)
+            elif isinstance(v, (int, float)):
+                std = BALANCE_SHEET_SYNONYMS.get(k.lower())
+                if std in agg:
+                    agg[std] += v
+    recurse(bg)
     return agg
 
-def map_and_aggregate_pnl(er_dict):
+def map_and_aggregate_pnl(er):
     agg = {c: 0.0 for c in PNL_STANDARD_CONCEPTS}
-    for acct, val in er_dict.items():
-        std = PNL_SYNONYMS.get(acct.lower())
-        if std in agg and isinstance(val, (int, float)):
-            agg[std] += val
+    def recurse(d):
+        for k, v in d.items():
+            if isinstance(v, dict):
+                recurse(v)
+            elif isinstance(v, (int, float)):
+                std = PNL_SYNONYMS.get(k.lower())
+                if std in agg:
+                    agg[std] += v
+    recurse(er)
     return agg
 
-def convert_dict_to_usd(d, rate):
+def convert_to_usd(d, rate):
     return {k: (v * rate if isinstance(v, (int, float)) else v) for k, v in d.items()}
 
 # --- Streamlit App ---
 st.set_page_config(layout="wide")
 st.title("Bot de Análisis de Estados Financieros → USD")
 
-uploaded = st.file_uploader("Sube tus PDFs (máx. 4)", type="pdf", accept_multiple_files=True)
-if uploaded and st.button("Procesar y Convertir a USD"):
-    all_results = {}
-    for f in uploaded:
-        all_results.update(extract_financial_data(f))
+files = st.file_uploader("Sube tus PDFs (máx. 4)", type="pdf", accept_multiple_files=True)
+if files and st.button("Procesar y Convertir a USD"):
+    all_data = {}
+    for f in files:
+        all_data.update(extract_financial_data(f))
 
-    if not all_results:
-        st.error("No se pudieron extraer datos de los PDFs.")
+    if not all_data:
+        st.error("No se extrajeron datos de los PDFs.")
         st.stop()
 
-    # Preparar DataFrames
-    bg_index = BALANCE_SHEET_STANDARD_CONCEPTS_LIST
-    pnl_index = PNL_STANDARD_CONCEPTS
-    df_bg = pd.DataFrame(index=bg_index)
-    df_pnl = pd.DataFrame(index=pnl_index)
+    # Prepara DataFrames
+    bg_idx = BALANCE_SHEET_STANDARD_CONCEPTS_LIST
+    pnl_idx = PNL_STANDARD_CONCEPTS
+    df_bg = pd.DataFrame(index=bg_idx)
+    df_pnl = pd.DataFrame(index=pnl_idx)
 
-    for key, info in all_results.items():
+    # Rellenar
+    for key, info in all_data.items():
         name, yr = key.rsplit("_", 1)
         yr = int(yr)
         rate = get_exchange_rate(info["Moneda"], yr)
 
-        agg_bg = map_and_aggregate_balance(info["BalanceGeneral"])
-        usd_bg = convert_dict_to_usd(agg_bg, rate)
+        bg_agg = map_and_aggregate_balance(info["BalanceGeneral"])
+        bg_usd = convert_to_usd(bg_agg, rate)
 
-        agg_er = map_and_aggregate_pnl(info["EstadoResultados"])
-        usd_er = convert_dict_to_usd(agg_er, rate)
+        er_agg = map_and_aggregate_pnl(info["EstadoResultados"])
+        er_usd = convert_to_usd(er_agg, rate)
 
         col = f"{name} ({yr})"
-        df_bg[col] = [f"{usd_bg.get(c, 0):,.2f}" for c in bg_index]
-        df_pnl[col] = [f"{usd_er.get(c, 0):,.2f}" for c in pnl_index]
+        df_bg[col] = [f"{bg_usd.get(c, 0):,.2f}" for c in bg_idx]
+        df_pnl[col] = [f"{er_usd.get(c, 0):,.2f}" for c in pnl_idx]
 
     st.subheader("Balance General (USD)")
     st.dataframe(df_bg)
-
-    st.subheader("Estado de Resultados (USD)")
+    st.subheader("Estado de Pérdidas y Ganancias (USD)")
     st.dataframe(df_pnl)
 
-    # Botón de descarga a Excel
-    buf = io.BytesIO()
-    with pd.ExcelWriter(buf, engine="xlsxwriter") as writer:
+    # Descargar Excel
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
         df_bg.to_excel(writer, sheet_name="BalanceGeneral_USD")
         df_pnl.to_excel(writer, sheet_name="EstadoResultados_USD")
-    buf.seek(0)
+    buffer.seek(0)
     st.download_button(
         "Descargar Estados Financieros en Excel",
-        data=buf,
+        data=buffer,
         file_name="EstadosFinancieros_USD.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
