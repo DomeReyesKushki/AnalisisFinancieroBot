@@ -7,7 +7,7 @@ import tempfile
 import io
 import re
 
-# --- Tu prompt completo para Gemini (defínelo solo una vez aquí) ---
+# --- Tu prompt completo para Gemini ---
 PROMPT_EXTRACTION = """
 Analiza cuidadosamente el siguiente documento PDF que contiene estados financieros.
 
@@ -28,8 +28,8 @@ Analiza cuidadosamente el siguiente documento PDF que contiene estados financier
   "ReportesPorAnio": [
     {
       "Anio": "2024",
-      "BalanceGeneral": { ... },
-      "EstadoResultados": { ... }
+      "BalanceGeneral": { … },
+      "EstadoResultados": { … }
     }
     // Puede haber otro objeto para 2023
   ]
@@ -93,15 +93,15 @@ BALANCE_SHEET_STRUCTURE = {
     "TOTAL PASIVO Y PATRIMONIO": [("TOTAL PASIVO Y PATRIMONIO", ["TOTAL PASIVO Y PATRIMONIO"])]
 }
 
-# Lista de conceptos y diccionario de sinónimos
+# Construcción de lista y diccionario de sinónimos
 BALANCE_SHEET_STANDARD_CONCEPTS_LIST = []
 BALANCE_SHEET_SYNONYMS = {}
 for cat, items in BALANCE_SHEET_STRUCTURE.items():
     BALANCE_SHEET_STANDARD_CONCEPTS_LIST.append(cat)
-    for std, syns in items:
-        BALANCE_SHEET_STANDARD_CONCEPTS_LIST.append(f"    {std}")
+    for std_name, syns in items:
+        BALANCE_SHEET_STANDARD_CONCEPTS_LIST.append(f"    {std_name}")
         for s in syns:
-            BALANCE_SHEET_SYNONYMS[s.lower()] = std
+            BALANCE_SHEET_SYNONYMS[s.lower()] = std_name
 
 PNL_STANDARD_CONCEPTS = [
     "Ingresos por Ventas", "Costo de Ventas", "Ganancia Bruta",
@@ -124,7 +124,8 @@ EXCHANGE_RATES_BY_YEAR_TO_USD = {
 }
 
 def get_exchange_rate(code, date=None):
-    if code.upper()=="USD": return 1.0
+    if code.upper() == "USD":
+        return 1.0
     return EXCHANGE_RATES_BY_YEAR_TO_USD.get(date, {}).get(code.upper(), 1.0)
 
 @st.cache_data(show_spinner=False)
@@ -143,11 +144,14 @@ def extract_financial_data(file_obj, api_key):
         part = genai.upload_file(path=path, display_name=name)
         prompt = PROMPT_EXTRACTION
 
+        # llamada a Gemini
         resp = model.generate_content([prompt, part], stream=False)
+
+        # debug: ver salida cruda
         st.write(">>> RESPUESTA GEMINI RAW:")
         st.text(resp.text)
 
-        # Extraer JSON con regex
+        # extraer JSON con regex
         m = re.search(r"(\{.*\})", resp.text, flags=re.DOTALL)
         if not m:
             st.error("No pude aislar un objeto JSON de la respuesta de Gemini.")
@@ -168,68 +172,78 @@ def extract_financial_data(file_obj, api_key):
                 }
 
         st.write(f"extract_financial_data para {name} devolvió: {list(data_out.keys())}")
+
     except Exception as e:
         st.error(f"Error al procesar {name}: {e}")
+
     finally:
-        if os.path.exists(path): os.remove(path)
-        if 'part' in locals(): genai.delete_file(part.name)
+        if os.path.exists(path):
+            os.remove(path)
+        if 'part' in locals():
+            genai.delete_file(part.name)
 
     return data_out
 
 def apply_scale_factor_to_raw_data(data, unit):
     factor = 1
     ul = unit.lower()
-    if "millones" in ul or "$m" in ul: factor = 1_000_000
-    if "miles" in ul: factor = 1_000
-    if not isinstance(data, dict): return data
+    if "millones" in ul or "$m" in ul:
+        factor = 1_000_000
+    elif "miles" in ul:
+        factor = 1_000
+    if not isinstance(data, dict):
+        return data
     out = {}
-    for k,v in data.items():
+    for k, v in data.items():
         if isinstance(v, dict):
             out[k] = apply_scale_factor_to_raw_data(v, unit)
-        elif isinstance(v, (int,float)):
+        elif isinstance(v, (int, float)):
             out[k] = v * factor
         else:
             out[k] = v
     return out
 
 def map_and_aggregate_balance(raw, syn_map, unit):
-    # inicializar todo en 0
-    agg = {c:0.0 for c in BALANCE_SHEET_STANDARD_CONCEPTS_LIST}
+    agg = {c: 0.0 for c in BALANCE_SHEET_STANDARD_CONCEPTS_LIST}
     scaled = apply_scale_factor_to_raw_data(raw, unit)
-    # recorre secciones y cuentas...
     for sec, content in scaled.items():
         if isinstance(content, dict):
             for sub, subcont in content.items():
                 if isinstance(subcont, dict):
                     for acct, val in subcont.items():
                         m = syn_map.get(acct.lower())
-                        if m in agg: agg[m] += val
-                elif isinstance(subcont, (int,float)):
+                        if m in agg:
+                            agg[m] += val
+                elif isinstance(subcont, (int, float)):
                     m = syn_map.get(sub.lower())
-                    if m in agg: agg[m] = subcont
-        elif isinstance(content, (int,float)):
+                    if m in agg:
+                        agg[m] = subcont
+        elif isinstance(content, (int, float)):
             m = syn_map.get(sec.lower())
-            if m in agg: agg[m] = content
+            if m in agg:
+                agg[m] = content
     return agg
 
 def map_and_aggregate_pnl(raw, syn_map, unit):
-    agg = {c:0.0 for c in PNL_STANDARD_CONCEPTS}
+    agg = {c: 0.0 for c in PNL_STANDARD_CONCEPTS}
     scaled = apply_scale_factor_to_raw_data(raw, unit)
     for sec, cont in scaled.items():
         if isinstance(cont, dict):
             for acct, val in cont.items():
                 m = syn_map.get(acct.lower())
-                if m in agg: agg[m] += val
-        elif isinstance(cont, (int,float)):
+                if m in agg:
+                    agg[m] += val
+        elif isinstance(cont, (int, float)):
             m = syn_map.get(sec.lower())
-            if m in agg: agg[m] = cont
+            if m in agg:
+                agg[m] = cont
     return agg
 
 def convert_to_usd(data_dict, currency, year):
     rate = get_exchange_rate(currency, year)
     out = {}
-    for k,v in data_dict.items():
-        if isinstance(v,(int,float)):
+    for k, v in data_dict.items():
+        if isinstance(v, (int, float)):
             out[k] = v * rate
         elif isinstance(v, dict):
             out[k] = convert_to_usd(v, currency, year)
@@ -251,24 +265,21 @@ if st.button("Procesar y Convertir a USD"):
     all_results = {}
     with st.spinner("Extrayendo datos..."):
         for f in uploaded:
-            res = extract_financial_data(f, GOOGLE_API_KEY)
-            all_results.update(res)
+            all_results.update(extract_financial_data(f, GOOGLE_API_KEY))
 
     if not all_results:
         st.error("No se pudieron extraer datos de ninguno de los PDFs.")
         st.stop()
 
-    # Agregar mapeo, agregación y conversión:
+    # Mapear, agregar y convertir
     final_display = {}
     for key, info in all_results.items():
-        name, yr = key.rsplit("_",1)
+        name, yr = key.rsplit("_", 1)
         yr = int(yr)
         cur = info["Moneda"].upper()
-        unit = info.get("Unidad","unidades")
-        bg_raw = info["BalanceGeneral"]
-        er_raw = info["EstadoResultados"]
-        agg_bg = map_and_aggregate_balance(bg_raw, BALANCE_SHEET_SYNONYMS, unit)
-        agg_er = map_and_aggregate_pnl(er_raw, PNL_SYNONYMS, unit)
+        unit = info.get("Unidad", "unidades")
+        agg_bg = map_and_aggregate_balance(info["BalanceGeneral"], BALANCE_SHEET_SYNONYMS, unit)
+        agg_er = map_and_aggregate_pnl(info["EstadoResultados"], PNL_SYNONYMS, unit)
         bg_usd = convert_to_usd(agg_bg, cur, yr)
         er_usd = convert_to_usd(agg_er, cur, yr)
         final_display.setdefault(name, {})[yr] = {
@@ -282,36 +293,36 @@ if st.button("Procesar y Convertir a USD"):
     balance_index = []
     for cat, items in BALANCE_SHEET_STRUCTURE.items():
         balance_index.append(cat)
-        for std, _ in items:
-            balance_index.append(f"    {std}")
+        for std_name, _ in items:
+            balance_index.append(f"    {std_name}")
 
     df_bg = pd.DataFrame(index=balance_index)
     df_pnl = pd.DataFrame(index=PNL_STANDARD_CONCEPTS)
 
-    # Poblar columnas
+    # Poblar columnas en ambos DataFrames
     for name, years in final_display.items():
         for yr, data in sorted(years.items()):
             col = f"{name} ({yr})"
-            # BG
-            series_bg = pd.Series(index=balance_index, dtype="object")
+
+            s_bg = pd.Series(index=balance_index, dtype="object")
             for idx in balance_index:
-                n = idx.strip()
-                val = data["BalanceGeneralUSD"].get(n)
-                series_bg[idx] = f"{val:,.2f}" if isinstance(val,(int,float)) else ""
-            df_bg[col] = series_bg
-            # PnL
-            series_er = pd.Series(index=PNL_STANDARD_CONCEPTS, dtype="object")
-            for n in PNL_STANDARD_CONCEPTS:
-                val = data["EstadoResultadosUSD"].get(n)
-                series_er[n] = f"{val:,.2f}" if isinstance(val,(int,float)) else ""
-            df_pnl[col] = series_er
+                val = data["BalanceGeneralUSD"].get(idx.strip())
+                s_bg[idx] = f"{val:,.2f}" if isinstance(val, (int, float)) else ""
+            df_bg[col] = s_bg
+
+            s_er = pd.Series(index=PNL_STANDARD_CONCEPTS, dtype="object")
+            for k in PNL_STANDARD_CONCEPTS:
+                val = data["EstadoResultadosUSD"].get(k)
+                s_er[k] = f"{val:,.2f}" if isinstance(val, (int, float)) else ""
+            df_pnl[col] = s_er
 
     st.subheader("Balance General (USD)")
     st.dataframe(df_bg)
+
     st.subheader("Estado de Pérdidas y Ganancias (USD)")
     st.dataframe(df_pnl)
 
-    # Descargar a Excel
+    # Descargar Excel
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="xlsxwriter") as writer:
         df_bg.to_excel(writer, sheet_name="BalanceGeneral_USD")
