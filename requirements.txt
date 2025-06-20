@@ -1,5 +1,5 @@
 streamlit
 pandas
-google-generativeai
-python-dotenv
+openai # <-- ¡Este es el cambio principal!
 xlsxwriter
+# python-dotenv # <-- Puedes borrar esta línea si solo vas a usar st.secrets en Streamlit Cloud
