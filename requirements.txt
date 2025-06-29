@@ -1,9 +1,9 @@
 gradio>=5.0
-python-dotenv
 pandas
-# Lo que uses dentro de processing.py:
-# por ejemplo si usas requests, camelot o tabula-py:
-requests
-camelot-py[cv]
-tabula-py
-# etc.
+python-dotenv
+openpyxl          # para escribir Excel
+# Dependencias de tu processing.py:
+requests          # si lo usas para la API de divisas
+camelot-py[cv]    # si lo usas para extraer tablas
+tabula-py         # o tabula según tu implementación
+# cualquier otra librería que processing.py importe
