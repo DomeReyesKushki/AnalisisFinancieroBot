@@ -1,5 +1,9 @@
-streamlit
+gradio>=5.0
+python-dotenv
 pandas
-openai # <-- ¡Este es el cambio principal!
-xlsxwriter
-# python-dotenv # <-- Puedes borrar esta línea si solo vas a usar st.secrets en Streamlit Cloud
+# Lo que uses dentro de processing.py:
+# por ejemplo si usas requests, camelot o tabula-py:
+requests
+camelot-py[cv]
+tabula-py
+# etc.
