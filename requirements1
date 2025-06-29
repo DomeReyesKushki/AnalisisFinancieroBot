@@ -1,0 +1,9 @@
+gradio>=5.0
+pandas
+python-dotenv
+openpyxl          # para escribir Excel
+# Dependencias de tu processing.py:
+requests          # si lo usas para la API de divisas
+camelot-py[cv]    # si lo usas para extraer tablas
+tabula-py         # o tabula según tu implementación
+# cualquier otra librería que processing.py importe
